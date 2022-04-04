@@ -17,7 +17,7 @@ Spotify
 --- 
 
 A couple months back I switched from Spotify to Apple Music just to try it out. So I have used Spotify for a couple years and Apple Music for three months now.
-So this is the result of my comparison.
+This is the result of my comparison:
 
 ## Audio quality
 Spotify offers a maximum streaming quality of `320 kbit/s` which is the bitrate of a MP3-File.
@@ -39,7 +39,7 @@ As I am more used to the Spotify UI I also find it pretty good.
 Still I tried out Apple Musics UI for the past three months and I honestly don't like it. It's a pain to use, not very intuitive and doesn't seem very efficient.
 Furthermore everything is just slow.
 
-## Lokal network streaming
+## Local network streaming
 Of course there is Airplay. It's pretty nice. A bit slow but it does the job and it works for both apps.
 Spotify also offers Spotify Connect which I find pretty good.  
 I run a [Spotify Connect server](https://github.com/dtcooper/raspotify) in my home and it's just a charm. 
