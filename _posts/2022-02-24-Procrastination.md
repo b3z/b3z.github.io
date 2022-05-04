@@ -22,9 +22,9 @@ It was just too bad. During this battle I found some good methods which helped m
 
 I started using a [pomodoro timer](https://en.wikipedia.org/wiki/Pomodoro_Technique).
 
-Work was then divided into 25 min slices with a 5 min break in between. All for slices I took a break of 15 min.
+Work was then divided into 25 min slices with a 5 min break in between. Every fourtht slice I took a break of 15 min.
 
-This worked out very well. I used those time slots way more efficient than I did before.
+This worked out very well. I used my time slots way more efficient than I did before.
 
 ### 2. Make spending time satisfying.
 
@@ -33,8 +33,8 @@ Here I had two approaches.
 Number one was just planting trees in the [Forest App](https://www.forestapp.cc). It does not do anything but it keeps me away from my phone.
 Additionally you slowly grow a forest of trees which is nice to see as it represents your work.
 
-The second approach was to play myself for every slice of time I finished. 
-I saved 2€ in a jar for every time slice I finished. I know - this is my own money - but still 
+The second approach was to pay myself for every slice of time I finished. 
+I saved 1€ in a jar for every time slice I finished. I know - this is my own money - but still 
 I was a good feeling and motivated me since I was about to invest these "earnings" into a savings plan.
 
 ### 3. Make work satisfying.
