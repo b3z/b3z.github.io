@@ -21,10 +21,10 @@ This is the result of my comparison:
 
 ## Audio quality
 Spotify offers a maximum streaming quality of `320 kbit/s` which is the bitrate of a MP3-File.
-Apple Music on the other hand is capable of `24bit/192kHz` which is the equivalent of `9216 kbit/s`.
+Apple Music on the other hand is capable of `24bit/192kHz`.
 This is much closer to studio quality than the `320 kbit/s`.
 
-In terms of audio quality is Apple Music clearly better. Not only on paper but you can hear a difference.
+In terms of audio quality is Apple Music clearly better. Not only on paper but you can hear a difference (I at least think I can :) ).
 
 ## Library & Recommendations
 So the libraries are pretty equal. Spotify also lists covered songs but I don't care much about those.
