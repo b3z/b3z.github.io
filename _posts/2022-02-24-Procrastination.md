@@ -18,7 +18,7 @@ I was supposed to study for my exams but instead I was tinkering on my computer 
 It was just too bad. During this battle I found some good methods which helped me to get back on track.
 
 ---
-### 1. Make time rare. Make breaks.
+### 1. Make time rare. Take breaks.
 
 I started using a [pomodoro timer](https://en.wikipedia.org/wiki/Pomodoro_Technique).
 
@@ -42,11 +42,7 @@ I was a good feeling and motivated me since I was about to invest these "earning
 Lastly I tried to make it as attractive as possible to sit down and work on my computer.
 Working on it is already kind of satisfying. With the right applications it becomes even more fun.
 
-Apps that satisfy me:
+Apps that I find satisfying to use
 - [Alfred](https://www.alfredapp.com)
 - [tmux](https://github.com/tmux/tmux/wiki)
 - [vim](https://en.wikipedia.org/wiki/Vim_(text_editor))
-- [VSCode](https://code.visualstudio.com)
-- [Notion](https://www.notion.so)
-
-
