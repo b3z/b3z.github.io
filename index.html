@@ -74,7 +74,10 @@
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
     .pill { display:inline-block; padding: 3px 8px; border-radius: 999px; border:1px solid var(--border); font-size: 12px; }
     .toolbar { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; margin-top: 8px; }
-    canvas { width: 100%; height: 420px; border-radius: 12px; border: 1px solid var(--border); background: var(--bgCanvas); display:block; }
+    canvas { width: 100%; border-radius: 12px; border: 1px solid var(--border); background: var(--bgCanvas); display:block; }
+
+    #cv { height: 420px; }
+    #polarCv { height: 260px; margin-top: 10px; }
 
     .numCtl { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: center; }
     .pmBtn { padding: 10px 0; font-weight: 700; font-size: 18px; line-height: 1; }
@@ -84,6 +87,9 @@
     .delta.pos { color: var(--pos); }
     .delta.neg { color: var(--neg); }
     .delta.zero, .base.zero { opacity: .55; }
+
+    .split2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    .miniCard { border: 1px solid var(--border2); border-radius: 12px; padding: 10px; }
   </style>
 </head>
 <body>
@@ -96,7 +102,7 @@
         <br/>
         Wind dirs are <span class="mono">FROM</span>, boat/current dirs are <span class="mono">TO</span>.
         <br/>
-        <span class="mono">BSP</span> comes from a demo polar (edit it in JS).
+        <span class="mono">BSP</span> comes from the loaded polar (edit it in JS).
       </div>
 
       <div class="toolbar">
@@ -204,6 +210,21 @@
 
       <div style="margin-top:10px;">
         <canvas id="cv" width="980" height="520"></canvas>
+        <canvas id="polarCv" width="980" height="360"></canvas>
+      </div>
+
+      <div class="split2">
+        <div class="miniCard small">
+          Polar view:
+          <br/>• thin curves = discrete <span class="mono">TWS</span> rows
+          <br/>• thick curve = interpolated at current <span class="mono">TWS</span>
+          <br/>• dot = current <span class="mono">(abs(TWA), BSP)</span>
+        </div>
+        <div class="miniCard small">
+          VMG markers:
+          <br/>• <span class="mono">▲</span> upwind VMG point (<span class="mono">twaUp/bspUp</span>)
+          <br/>• <span class="mono">▼</span> downwind VMG point (<span class="mono">twaDn/bspDn</span>)
+        </div>
       </div>
     </div>
   </div>
@@ -261,25 +282,113 @@
 
   const el = id => document.getElementById(id);
 
-  // ---------- demo polar (edit this for your boat) ----------
-  // angles in deg (0..180), speeds in kn
-  const POLAR_TWA = [0, 30, 45, 60, 90, 120, 150, 180];
-  const POLAR_TWS = [6, 10, 14, 18, 22];
+  // ---------- POLAR (DEFAULT = your provided table) ----------
+  // Each row has its own TWA points (VMG TWAs differ by TWS).
+  // We add a synthetic (0°, 0 kn) to keep behavior sane near 0°.
+  const POLAR_ROWS = [
+    { tws: 6,  points: [
+      {twa: 0,    bsp: 0},
+      {twa: 44.2, bsp: 5.29},
+      {twa: 52,   bsp: 5.87},
+      {twa: 60,   bsp: 6.27},
+      {twa: 75,   bsp: 6.62},
+      {twa: 90,   bsp: 6.70},
+      {twa: 110,  bsp: 6.28},
+      {twa: 120,  bsp: 5.92},
+      {twa: 135,  bsp: 5.27},
+      {twa: 144,  bsp: 4.77},
+      {twa: 180,  bsp: 2.57},
+    ], vmgUp: {twa: 44.2, bsp: 5.29}, vmgDn: {twa: 144, bsp: 4.77} },
 
-  // rows correspond to POLAR_TWS, columns to POLAR_TWA
-  // NOTE: this is just a smooth-ish placeholder. Replace with your real polar.
-  const POLAR_BSP = [
-    // TWS=6
-    [0, 5.6, 6.1, 6.3, 6.4, 6.0, 5.2, 0],
-    // TWS=10
-    [0, 6.6, 7.3, 7.8, 8.1, 7.9, 7.0, 0],
-    // TWS=14
-    [0, 7.4, 8.2, 8.8, 9.3, 9.6, 9.0, 0],
-    // TWS=18
-    [0, 7.9, 8.8, 9.5, 10.2, 10.8, 10.4, 0],
-    // TWS=22
-    [0, 8.1, 9.0, 9.7, 10.6, 11.4, 11.2, 0],
-  ];
+    { tws: 8,  points: [
+      {twa: 0,   bsp: 0},
+      {twa: 42,  bsp: 5.99},
+      {twa: 52,  bsp: 6.65},
+      {twa: 60,  bsp: 6.91},
+      {twa: 75,  bsp: 7.19},
+      {twa: 90,  bsp: 7.27},
+      {twa: 110, bsp: 7.03},
+      {twa: 120, bsp: 6.94},
+      {twa: 135, bsp: 6.52},
+      {twa: 148, bsp: 5.70},
+      {twa: 180, bsp: 3.67},
+    ], vmgUp: {twa: 42, bsp: 5.99}, vmgDn: {twa: 148, bsp: 5.70} },
+
+    { tws: 10, points: [
+      {twa: 0,    bsp: 0},
+      {twa: 39,   bsp: 6.27},
+      {twa: 52,   bsp: 6.92},
+      {twa: 60,   bsp: 7.14},
+      {twa: 75,   bsp: 7.52},
+      {twa: 90,   bsp: 7.77},
+      {twa: 110,  bsp: 7.64},
+      {twa: 120,  bsp: 7.56},
+      {twa: 135,  bsp: 7.20},
+      {twa: 149.2,bsp: 6.59},
+      {twa: 180,  bsp: 4.35},
+    ], vmgUp: {twa: 39, bsp: 6.27}, vmgDn: {twa: 149.2, bsp: 6.59} },
+
+    { tws: 12, points: [
+      {twa: 0,   bsp: 0},
+      {twa: 37.9,bsp: 6.37},
+      {twa: 52,  bsp: 7.08},
+      {twa: 60,  bsp: 7.31},
+      {twa: 75,  bsp: 7.75},
+      {twa: 90,  bsp: 8.16},
+      {twa: 110, bsp: 8.14},
+      {twa: 120, bsp: 8.27},
+      {twa: 135, bsp: 7.81},
+      {twa: 151, bsp: 7.07},
+      {twa: 180, bsp: 4.83},
+    ], vmgUp: {twa: 37.9, bsp: 6.37}, vmgDn: {twa: 151, bsp: 7.07} },
+
+    { tws: 14, points: [
+      {twa: 0,   bsp: 0},
+      {twa: 38.2,bsp: 6.48},
+      {twa: 52,  bsp: 7.15},
+      {twa: 60,  bsp: 7.41},
+      {twa: 75,  bsp: 7.92},
+      {twa: 90,  bsp: 8.43},
+      {twa: 110, bsp: 8.58},
+      {twa: 120, bsp: 8.91},
+      {twa: 135, bsp: 8.52},
+      {twa: 175, bsp: 6.62},
+      {twa: 180, bsp: 6.29},
+    ], vmgUp: {twa: 38.2, bsp: 6.48}, vmgDn: {twa: 175, bsp: 6.62} },
+
+    { tws: 16, points: [
+      {twa: 0,   bsp: 0},
+      {twa: 37.9,bsp: 6.53},
+      {twa: 52,  bsp: 7.19},
+      {twa: 60,  bsp: 7.46},
+      {twa: 75,  bsp: 8.06},
+      {twa: 90,  bsp: 8.65},
+      {twa: 110, bsp: 9.17},
+      {twa: 120, bsp: 9.36},
+      {twa: 135, bsp: 9.39},
+      {twa: 175, bsp: 7.08},
+      {twa: 180, bsp: 6.73},
+    ], vmgUp: {twa: 37.9, bsp: 6.53}, vmgDn: {twa: 175, bsp: 7.08} },
+
+    { tws: 20, points: [
+      {twa: 0,   bsp: 0},
+      {twa: 38.6,bsp: 6.59},
+      {twa: 52,  bsp: 7.31},
+      {twa: 60,  bsp: 7.65},
+      {twa: 75,  bsp: 8.17},
+      {twa: 90,  bsp: 8.96},
+      {twa: 110, bsp: 10.08},
+      {twa: 120, bsp: 10.54},
+      {twa: 135, bsp: 11.59},
+      {twa: 141, bsp: 10.91},
+      {twa: 180, bsp: 5.65},
+    ], vmgUp: {twa: 38.6, bsp: 6.59}, vmgDn: {twa: 141, bsp: 10.91} },
+  ].map(r => ({
+    ...r,
+    points: r.points.slice().sort((a,b) => a.twa - b.twa)
+  }));
+
+  const POLAR_TWS = POLAR_ROWS.map(r => r.tws);
 
   function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -299,20 +408,41 @@
     return { i0: 0, i1: 0, t: 0 };
   }
 
-  // bilinear interpolation over (TWS, TWA)
-  function polarBSP(tws, twaAbs) {
+  function evalRowAtTWA(row, twaAbs) {
+    const pts = row.points;
     const twa = clamp(Math.abs(twaAbs), 0, 180);
-    const { i0: w0, i1: w1, t: tw } = findSpan(POLAR_TWS, tws);
-    const { i0: a0, i1: a1, t: ta } = findSpan(POLAR_TWA, twa);
 
-    const f00 = POLAR_BSP[w0][a0];
-    const f01 = POLAR_BSP[w0][a1];
-    const f10 = POLAR_BSP[w1][a0];
-    const f11 = POLAR_BSP[w1][a1];
+    if (twa <= pts[0].twa) return pts[0].bsp;
+    if (twa >= pts[pts.length - 1].twa) return pts[pts.length - 1].bsp;
 
-    const f0 = lerp(f00, f01, ta);
-    const f1 = lerp(f10, f11, ta);
-    return lerp(f0, f1, tw);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      if (twa >= a.twa && twa <= b.twa) {
+        const t = (twa - a.twa) / (b.twa - a.twa);
+        return lerp(a.bsp, b.bsp, t);
+      }
+    }
+    return pts[pts.length - 1].bsp;
+  }
+
+  // interpolate across TWS by evaluating each bracketing row at requested TWA
+  function polarBSP(tws, twaAbs) {
+    const { i0, i1, t } = findSpan(POLAR_TWS, tws);
+    const r0 = POLAR_ROWS[i0], r1 = POLAR_ROWS[i1];
+    const f0 = evalRowAtTWA(r0, twaAbs);
+    const f1 = evalRowAtTWA(r1, twaAbs);
+    return lerp(f0, f1, t);
+  }
+
+  function polarVMGPoint(tws, which /* "up"|"dn" */) {
+    const { i0, i1, t } = findSpan(POLAR_TWS, tws);
+    const r0 = POLAR_ROWS[i0], r1 = POLAR_ROWS[i1];
+    const p0 = which === "up" ? r0.vmgUp : r0.vmgDn;
+    const p1 = which === "up" ? r1.vmgUp : r1.vmgDn;
+    return {
+      twa: lerp(p0.twa, p1.twa, t),
+      bsp: lerp(p0.bsp, p1.bsp, t),
+    };
   }
 
   // ---------- UI refs ----------
@@ -363,6 +493,7 @@
       vec: cs.getPropertyValue("--vec").trim() || "rgba(30,30,30,.92)",
       grid: cs.getPropertyValue("--grid").trim() || "rgba(127,127,127,.45)",
       hdg: cs.getPropertyValue("--hdg").trim() || "rgba(127,127,127,.85)",
+      border: cs.getPropertyValue("--border").trim() || "rgba(127,127,127,.35)",
     };
   }
 
@@ -603,9 +734,15 @@
       GWD_from,
       GWS
     });
+
+    drawPolarCanvas({
+      TWS,
+      TWA,
+      BSP
+    });
   }
 
-  // ---------- canvas ----------
+  // ---------- vector canvas ----------
   const cv = el("cv");
   const ctx = cv.getContext("2d");
 
@@ -739,7 +876,7 @@
     drawArrow(origin, V_cur,  scale, "cur", { width: 2, alpha: 0.55, dash: [2, 6] });
 
     // AW arrow points TO (wind velocity)
-    const awOrigin = { x: origin.x, y: origin.y}; 
+    const awOrigin = { x: origin.x, y: origin.y };
     drawArrow(awOrigin, V_aw_to, scale, "AW", { width: 1, alpha: 0.3 });
 
     drawBoat(origin, HDG);
@@ -748,7 +885,165 @@
     drawInsetWind(box, V_gw_to, GWD_from, GWS);
   }
 
-  // init
+  // ---------- polar canvas ----------
+  const polarCv = el("polarCv");
+  const pctx = polarCv.getContext("2d");
+
+  function drawPolarCanvas(s) {
+    const { TWS, TWA, BSP } = s;
+
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const cssW = polarCv.clientWidth, cssH = polarCv.clientHeight;
+    const W = Math.floor(cssW * dpr), H = Math.floor(cssH * dpr);
+    if (polarCv.width !== W || polarCv.height !== H) { polarCv.width = W; polarCv.height = H; }
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    pctx.clearRect(0, 0, cssW, cssH);
+
+    const pad = { l: 48, r: 18, t: 16, b: 34 };
+    const plotW = cssW - pad.l - pad.r;
+    const plotH = cssH - pad.t - pad.b;
+
+    // y max from polar (a bit padded)
+    let yMax = 1;
+    for (const r of POLAR_ROWS) for (const pt of r.points) yMax = Math.max(yMax, pt.bsp);
+    yMax = Math.ceil((yMax + 0.6) * 2) / 2;
+
+    const xMin = 0, xMax = 180;
+    const xToPx = x => pad.l + (clamp(x, xMin, xMax) - xMin) / (xMax - xMin) * plotW;
+    const yToPx = y => pad.t + (1 - clamp(y, 0, yMax) / yMax) * plotH;
+
+    // axes + grid
+    pctx.save();
+    pctx.strokeStyle = state.theme.grid;
+    pctx.fillStyle = state.theme.vec;
+
+    pctx.globalAlpha = 0.55;
+    pctx.lineWidth = 1;
+
+    // vertical grid every 30°
+    for (let x = 0; x <= 180; x += 30) {
+      const px = xToPx(x);
+      pctx.beginPath(); pctx.moveTo(px, pad.t); pctx.lineTo(px, pad.t + plotH); pctx.stroke();
+    }
+    // horizontal grid every 2 kn
+    const yStep = 2;
+    for (let y = 0; y <= yMax + 1e-9; y += yStep) {
+      const py = yToPx(y);
+      pctx.beginPath(); pctx.moveTo(pad.l, py); pctx.lineTo(pad.l + plotW, py); pctx.stroke();
+    }
+
+    // axes
+    pctx.globalAlpha = 0.85;
+    pctx.beginPath(); pctx.moveTo(pad.l, pad.t); pctx.lineTo(pad.l, pad.t + plotH); pctx.stroke();
+    pctx.beginPath(); pctx.moveTo(pad.l, pad.t + plotH); pctx.lineTo(pad.l + plotW, pad.t + plotH); pctx.stroke();
+
+    // labels
+    pctx.globalAlpha = 1;
+    pctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+    pctx.fillText("TWA (abs)", pad.l, cssH - 12);
+    pctx.fillText("BSP", 10, pad.t + 12);
+
+    // tick labels
+    pctx.globalAlpha = 0.9;
+    for (let x = 0; x <= 180; x += 30) {
+      const px = xToPx(x);
+      pctx.fillText(`${x}°`, px - 10, pad.t + plotH + 18);
+    }
+    for (let y = 0; y <= yMax + 1e-9; y += yStep) {
+      const py = yToPx(y);
+      pctx.fillText(`${y.toFixed(0)}`, 16, py + 4);
+    }
+
+    // header
+    pctx.globalAlpha = 1;
+    pctx.fillText(`POLAR  (TWS≈${fmt(TWS,1)} kn)`, pad.l, 14);
+
+    // thin curves for each discrete row
+    pctx.globalAlpha = 0.35;
+    pctx.lineWidth = 2;
+    pctx.setLineDash([6, 6]);
+    for (const r of POLAR_ROWS) {
+      pctx.beginPath();
+      const pts = r.points;
+      for (let i = 0; i < pts.length; i++) {
+        const px = xToPx(pts[i].twa);
+        const py = yToPx(pts[i].bsp);
+        if (i === 0) pctx.moveTo(px, py);
+        else pctx.lineTo(px, py);
+      }
+      pctx.strokeStyle = state.theme.vec;
+      pctx.stroke();
+    }
+
+    // thick interpolated curve at current TWS
+    pctx.globalAlpha = 0.95;
+    pctx.lineWidth = 3;
+    pctx.setLineDash([]);
+    pctx.beginPath();
+    for (let x = 0; x <= 180; x += 2) {
+      const y = polarBSP(TWS, x);
+      const px = xToPx(x);
+      const py = yToPx(y);
+      if (x === 0) pctx.moveTo(px, py);
+      else pctx.lineTo(px, py);
+    }
+    pctx.strokeStyle = state.theme.vec;
+    pctx.stroke();
+
+    // VMG markers (interpolated)
+    const up = polarVMGPoint(TWS, "up");
+    const dn = polarVMGPoint(TWS, "dn");
+
+    function drawMarker(px, py, kind) {
+      pctx.save();
+      pctx.translate(px, py);
+      pctx.fillStyle = state.theme.vec;
+      pctx.strokeStyle = state.theme.vec;
+      pctx.globalAlpha = 0.95;
+
+      // small triangle
+      const s = 7;
+      pctx.beginPath();
+      if (kind === "up") {
+        pctx.moveTo(0, -s);
+        pctx.lineTo(s, s);
+        pctx.lineTo(-s, s);
+      } else {
+        pctx.moveTo(0, s);
+        pctx.lineTo(s, -s);
+        pctx.lineTo(-s, -s);
+      }
+      pctx.closePath();
+      pctx.fill();
+
+      pctx.restore();
+    }
+
+    drawMarker(xToPx(up.twa), yToPx(up.bsp), "up");
+    drawMarker(xToPx(dn.twa), yToPx(dn.bsp), "dn");
+
+    // current point (abs(TWA), BSP)
+    const xCur = clamp(Math.abs(TWA), 0, 180);
+    const pxCur = xToPx(xCur);
+    const pyCur = yToPx(BSP);
+
+    pctx.globalAlpha = 1;
+    pctx.beginPath();
+    pctx.arc(pxCur, pyCur, 5, 0, Math.PI * 2);
+    pctx.fillStyle = state.theme.vec;
+    pctx.fill();
+
+    // annotation
+    pctx.globalAlpha = 0.95;
+    pctx.fillStyle = state.theme.vec;
+    const label = `TWA ${xCur.toFixed(1)}°  BSP ${fmt(BSP,2)} kn`;
+    pctx.fillText(label, Math.min(pxCur + 10, pad.l + plotW - 220), Math.max(pyCur - 10, pad.t + 14));
+
+    pctx.restore();
+  }
+
+  // ---------- init ----------
   setDefaults();
   readTheme();
   recalc(true);
