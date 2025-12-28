@@ -5,24 +5,89 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sailing Processor Model (Single File)</title>
   <style>
-    :root { color-scheme: light dark; }
+    :root {
+      color-scheme: light dark;
+
+      /* UI + canvas theme tokens */
+      --border: rgba(127,127,127,.35);
+      --border2: rgba(127,127,127,.25);
+      --muted: rgba(127,127,127,.85);
+      --bgCanvas: rgba(127,127,127,.06);
+
+      --vec: rgba(30,30,30,.92);
+      --grid: rgba(127,127,127,.55);
+      --hdg: rgba(127,127,127,.85);
+
+      --pos: #1a8f3a;
+      --neg: #c62828;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --border: rgba(255,255,255,.18);
+        --border2: rgba(255,255,255,.12);
+        --muted: rgba(255,255,255,.78);
+        --bgCanvas: rgba(255,255,255,.06);
+
+        --vec: rgba(245,245,245,.92);
+        --grid: rgba(255,255,255,.25);
+        --hdg: rgba(255,255,255,.60);
+
+        --pos: #47d16a;
+        --neg: #ff5a5a;
+      }
+    }
+
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 16px; }
     h1 { margin: 0 0 12px 0; font-size: 18px; font-weight: 650; }
-    .grid { display: grid; grid-template-columns: 360px 1fr; gap: 16px; align-items: start; }
-    .card { border: 1px solid rgba(127,127,127,.35); border-radius: 12px; padding: 12px; }
-    .row { display: grid; grid-template-columns: 1fr 96px; gap: 10px; align-items: center; margin: 10px 0; }
+    .grid { display: grid; grid-template-columns: 420px 1fr; gap: 16px; align-items: start; }
+    .card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; margin: 10px 0; }
     label { font-size: 12px; opacity: 0.9; }
     input[type="range"] { width: 100%; }
-    input[type="number"] { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(127,127,127,.35); background: transparent; }
-    button { padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(127,127,127,.35); background: transparent; }
+
+    /* Number input: hide native steppers so user uses +/- buttons */
+    input[type="number"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      font-size: 14px;
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+
+    button {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:active { transform: translateY(1px); }
+
     .small { font-size: 12px; opacity: .85; line-height: 1.35; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    td { padding: 6px 8px; border-bottom: 1px solid rgba(127,127,127,.25); }
-    td:first-child { opacity: .85; width: 42%; }
-    .pill { display:inline-block; padding: 3px 8px; border-radius: 999px; border:1px solid rgba(127,127,127,.35); font-size: 12px; }
-    .toolbar { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; margin-top: 8px; }
-    canvas { width: 100%; height: 420px; border-radius: 12px; border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.06); display:block; }
+    th, td { padding: 6px 8px; border-bottom: 1px solid var(--border2); }
+    th { text-align: left; font-weight: 650; opacity: .9; }
+    td:first-child { opacity: .85; width: 38%; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .pill { display:inline-block; padding: 3px 8px; border-radius: 999px; border:1px solid var(--border); font-size: 12px; }
+    .toolbar { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; margin-top: 8px; }
+    canvas { width: 100%; height: 420px; border-radius: 12px; border: 1px solid var(--border); background: var(--bgCanvas); display:block; }
+
+    .numCtl { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: center; }
+    .pmBtn { padding: 10px 0; font-weight: 700; font-size: 18px; line-height: 1; }
+
+    .delta { width: 22%; opacity: .9; }
+    .delta.mono { font-variant-numeric: tabular-nums; }
+    .delta.pos { color: var(--pos); }
+    .delta.neg { color: var(--neg); }
+    .delta.zero { opacity: .55; }
   </style>
 </head>
 <body>
@@ -46,41 +111,71 @@
         <span class="pill">kn</span>
       </div>
 
-      <hr style="border:none;border-top:1px solid rgba(127,127,127,.25); margin: 12px 0;" />
+      <hr style="border:none;border-top:1px solid var(--border2); margin: 12px 0;" />
 
+      <!-- HDG -->
       <div class="row">
         <label for="hdg">HDG</label>
-        <input id="hdgN" type="number" step="1" />
+        <div class="numCtl">
+          <button class="pmBtn" id="hdgM" aria-label="HDG minus">−</button>
+          <input id="hdgN" type="number" step="1" />
+          <button class="pmBtn" id="hdgP" aria-label="HDG plus">+</button>
+        </div>
       </div>
       <input id="hdg" type="range" min="0" max="359" step="1" />
 
+      <!-- BSP -->
       <div class="row">
         <label for="bsp">BSP</label>
-        <input id="bspN" type="number" step="1" />
+        <div class="numCtl">
+          <button class="pmBtn" id="bspM" aria-label="BSP minus">−</button>
+          <input id="bspN" type="number" step="1" />
+          <button class="pmBtn" id="bspP" aria-label="BSP plus">+</button>
+        </div>
       </div>
       <input id="bsp" type="range" min="0" max="20" step="1" />
 
+      <!-- GWD -->
       <div class="row">
         <label for="gwd">GWD</label>
-        <input id="gwdN" type="number" step="1" />
+        <div class="numCtl">
+          <button class="pmBtn" id="gwdM" aria-label="GWD minus">−</button>
+          <input id="gwdN" type="number" step="1" />
+          <button class="pmBtn" id="gwdP" aria-label="GWD plus">+</button>
+        </div>
       </div>
       <input id="gwd" type="range" min="0" max="359" step="1" />
 
+      <!-- GWS -->
       <div class="row">
         <label for="gws">GWS</label>
-        <input id="gwsN" type="number" step="1" />
+        <div class="numCtl">
+          <button class="pmBtn" id="gwsM" aria-label="GWS minus">−</button>
+          <input id="gwsN" type="number" step="1" />
+          <button class="pmBtn" id="gwsP" aria-label="GWS plus">+</button>
+        </div>
       </div>
       <input id="gws" type="range" min="0" max="60" step="1" />
 
+      <!-- SET -->
       <div class="row">
         <label for="set">SET</label>
-        <input id="setN" type="number" step="1" />
+        <div class="numCtl">
+          <button class="pmBtn" id="setM" aria-label="SET minus">−</button>
+          <input id="setN" type="number" step="1" />
+          <button class="pmBtn" id="setP" aria-label="SET plus">+</button>
+        </div>
       </div>
       <input id="set" type="range" min="0" max="359" step="1" />
 
+      <!-- DRIFT -->
       <div class="row">
         <label for="drift">DRIFT</label>
-        <input id="driftN" type="number" step="1" />
+        <div class="numCtl">
+          <button class="pmBtn" id="driftM" aria-label="DRIFT minus">−</button>
+          <input id="driftN" type="number" step="1" />
+          <button class="pmBtn" id="driftP" aria-label="DRIFT plus">+</button>
+        </div>
       </div>
       <input id="drift" type="range" min="0" max="6" step="1" />
 
@@ -97,19 +192,26 @@
 
     <div class="card">
       <table>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th class="mono">Value</th>
+            <th class="mono">Δ</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><td>COG</td><td class="mono" id="cog"></td></tr>
-          <tr><td>SOG</td><td class="mono" id="sog"></td></tr>
+          <tr><td>COG</td><td class="mono" id="cog"></td><td class="mono delta" id="cogD"></td></tr>
+          <tr><td>SOG</td><td class="mono" id="sog"></td><td class="mono delta" id="sogD"></td></tr>
 
-          <tr><td>AWA</td><td class="mono" id="awa"></td></tr>
-          <tr><td>AWS</td><td class="mono" id="aws"></td></tr>
+          <tr><td>AWA</td><td class="mono" id="awa"></td><td class="mono delta" id="awaD"></td></tr>
+          <tr><td>AWS</td><td class="mono" id="aws"></td><td class="mono delta" id="awsD"></td></tr>
 
-          <tr><td>TWA</td><td class="mono" id="twa"></td></tr>
-          <tr><td>TWS</td><td class="mono" id="twsOut"></td></tr>
-          <tr><td>TWD</td><td class="mono" id="twdOut"></td></tr>
+          <tr><td>TWA</td><td class="mono" id="twa"></td><td class="mono delta" id="twaD"></td></tr>
+          <tr><td>TWS</td><td class="mono" id="twsOut"></td><td class="mono delta" id="twsD"></td></tr>
+          <tr><td>TWD</td><td class="mono" id="twdOut"></td><td class="mono delta" id="twdD"></td></tr>
 
-          <tr><td>SET/DRIFT</td><td class="mono" id="setDrift"></td></tr>
-          <tr><td>GWD/GWS</td><td class="mono" id="gwdGwsEcho"></td></tr>
+          <tr><td>SET/DRIFT</td><td class="mono" id="setDrift"></td><td class="mono delta" id="setDriftD"></td></tr>
+          <tr><td>GWD/GWS</td><td class="mono" id="gwdGwsEcho"></td><td class="mono delta" id="gwdGwsD"></td></tr>
         </tbody>
       </table>
 
@@ -135,6 +237,14 @@
   const deg2rad = d => d * Math.PI / 180;
   const rad2deg = r => r * 180 / Math.PI;
   const wrap360 = d => (d % 360 + 360) % 360;
+
+  // shortest signed angle difference (a - b) in [-180, 180)
+  function angDiffDeg(a, b) {
+    let d = ((a - b + 540) % 360) - 180;
+    // avoid showing -180 when +180 is equally valid
+    if (d === -180) d = 180;
+    return d;
+  }
 
   // Bearing (deg true, TO) -> NE vector (x=E, y=N)
   function vecFromBearingTo(bearingDeg, speed) {
@@ -181,12 +291,12 @@
   const el = id => document.getElementById(id);
 
   const inputs = {
-    hdg: el("hdg"), hdgN: el("hdgN"),
-    bsp: el("bsp"), bspN: el("bspN"),
-    gwd: el("gwd"), gwdN: el("gwdN"),
-    gws: el("gws"), gwsN: el("gwsN"),
-    set: el("set"), setN: el("setN"),
-    drift: el("drift"), driftN: el("driftN"),
+    hdg: el("hdg"), hdgN: el("hdgN"), hdgM: el("hdgM"), hdgP: el("hdgP"),
+    bsp: el("bsp"), bspN: el("bspN"), bspM: el("bspM"), bspP: el("bspP"),
+    gwd: el("gwd"), gwdN: el("gwdN"), gwdM: el("gwdM"), gwdP: el("gwdP"),
+    gws: el("gws"), gwsN: el("gwsN"), gwsM: el("gwsM"), gwsP: el("gwsP"),
+    set: el("set"), setN: el("setN"), setM: el("setM"), setP: el("setP"),
+    drift: el("drift"), driftN: el("driftN"), driftM: el("driftM"), driftP: el("driftP"),
     reset: el("reset")
   };
 
@@ -195,30 +305,97 @@
     awa: el("awa"), aws: el("aws"),
     twa: el("twa"), twsOut: el("twsOut"), twdOut: el("twdOut"),
     setDrift: el("setDrift"),
-    gwdGwsEcho: el("gwdGwsEcho")
+    gwdGwsEcho: el("gwdGwsEcho"),
+
+    cogD: el("cogD"), sogD: el("sogD"),
+    awaD: el("awaD"), awsD: el("awsD"),
+    twaD: el("twaD"), twsD: el("twsD"), twdD: el("twdD"),
+    setDriftD: el("setDriftD"),
+    gwdGwsD: el("gwdGwsD"),
   };
 
-  function bindRangeAndNumber(rangeEl, numEl) {
-    function syncFromRange() { numEl.value = rangeEl.value; recalc(); }
-    function syncFromNum() {
-      const v = Number(numEl.value);
-      if (Number.isFinite(v)) {
-        rangeEl.value = String(Math.min(Number(rangeEl.max), Math.max(Number(rangeEl.min), v)));
-      }
-      recalc();
-    }
-    rangeEl.addEventListener("input", syncFromRange);
-    numEl.addEventListener("input", syncFromNum);
+  const state = {
+    prev: null,
+    theme: null
+  };
+
+  function readTheme() {
+    const cs = getComputedStyle(document.documentElement);
+    state.theme = {
+      vec: cs.getPropertyValue("--vec").trim() || "rgba(30,30,30,.92)",
+      grid: cs.getPropertyValue("--grid").trim() || "rgba(127,127,127,.55)",
+      hdg: cs.getPropertyValue("--hdg").trim() || "rgba(127,127,127,.85)",
+    };
   }
 
-  bindRangeAndNumber(inputs.hdg, inputs.hdgN);
-  bindRangeAndNumber(inputs.bsp, inputs.bspN);
-  bindRangeAndNumber(inputs.gwd, inputs.gwdN);
-  bindRangeAndNumber(inputs.gws, inputs.gwsN);
-  bindRangeAndNumber(inputs.set, inputs.setN);
-  bindRangeAndNumber(inputs.drift, inputs.driftN);
+  function bindRangeAndNumber(rangeEl, numEl) {
+    function clampToRange(v) {
+      const min = Number(rangeEl.min), max = Number(rangeEl.max);
+      if (!Number.isFinite(v)) return Number(rangeEl.value);
+      return Math.min(max, Math.max(min, v));
+    }
 
-  inputs.reset.addEventListener("click", () => { setDefaults(); recalc(); });
+    function syncFromRange() { numEl.value = rangeEl.value; recalc(); }
+    function syncFromNum() {
+      const v = clampToRange(Number(numEl.value));
+      rangeEl.value = String(v);
+      numEl.value = String(v);
+      recalc();
+    }
+
+    rangeEl.addEventListener("input", syncFromRange);
+    numEl.addEventListener("input", syncFromNum);
+
+    return { clampToRange, syncFromNum };
+  }
+
+  const binders = {
+    hdg: bindRangeAndNumber(inputs.hdg, inputs.hdgN),
+    bsp: bindRangeAndNumber(inputs.bsp, inputs.bspN),
+    gwd: bindRangeAndNumber(inputs.gwd, inputs.gwdN),
+    gws: bindRangeAndNumber(inputs.gws, inputs.gwsN),
+    set: bindRangeAndNumber(inputs.set, inputs.setN),
+    drift: bindRangeAndNumber(inputs.drift, inputs.driftN),
+  };
+
+  function nudge(key, dir) {
+    const rangeEl = inputs[key];
+    const numEl = inputs[key + "N"];
+    const step = Number(rangeEl.step || 1);
+    const cur = Number(rangeEl.value);
+    let next = cur + dir * step;
+
+    // wrap angles
+    if (key === "hdg" || key === "gwd" || key === "set") {
+      next = wrap360(next);
+    }
+
+    // clamp others
+    const min = Number(rangeEl.min), max = Number(rangeEl.max);
+    if (!(key === "hdg" || key === "gwd" || key === "set")) {
+      next = Math.min(max, Math.max(min, next));
+    }
+
+    rangeEl.value = String(next);
+    numEl.value = String(next);
+    recalc();
+  }
+
+  // plus/minus button wiring
+  inputs.hdgM.addEventListener("click", () => nudge("hdg", -1));
+  inputs.hdgP.addEventListener("click", () => nudge("hdg", +1));
+  inputs.bspM.addEventListener("click", () => nudge("bsp", -1));
+  inputs.bspP.addEventListener("click", () => nudge("bsp", +1));
+  inputs.gwdM.addEventListener("click", () => nudge("gwd", -1));
+  inputs.gwdP.addEventListener("click", () => nudge("gwd", +1));
+  inputs.gwsM.addEventListener("click", () => nudge("gws", -1));
+  inputs.gwsP.addEventListener("click", () => nudge("gws", +1));
+  inputs.setM.addEventListener("click", () => nudge("set", -1));
+  inputs.setP.addEventListener("click", () => nudge("set", +1));
+  inputs.driftM.addEventListener("click", () => nudge("drift", -1));
+  inputs.driftP.addEventListener("click", () => nudge("drift", +1));
+
+  inputs.reset.addEventListener("click", () => { setDefaults(); recalc(true); });
 
   function setDefaults() {
     inputs.hdg.value = "318"; inputs.hdgN.value = "318";
@@ -229,7 +406,22 @@
     inputs.drift.value = "0"; inputs.driftN.value = "0";
   }
 
-  function recalc() {
+  function setDeltaCell(cell, delta, isAngle=false, digits=2) {
+    cell.classList.remove("pos", "neg", "zero");
+    if (!Number.isFinite(delta)) { cell.textContent = "—"; cell.classList.add("zero"); return; }
+
+    const eps = isAngle ? 0.5 : 1e-9;
+    if (Math.abs(delta) < eps) { cell.textContent = "0"; cell.classList.add("zero"); return; }
+
+    const sign = delta > 0 ? "+" : "";
+    const txt = isAngle ? `${sign}${delta.toFixed(0)}°` : `${sign}${delta.toFixed(digits)}`;
+    cell.textContent = txt;
+    cell.classList.add(delta > 0 ? "pos" : "neg");
+  }
+
+  function recalc(resetDelta=false) {
+    readTheme();
+
     const HDG = Number(inputs.hdg.value);
     const BSP = Number(inputs.bsp.value);
 
@@ -274,7 +466,7 @@
     const V_tw_from_boat = { x: -V_tw_boat.x, y: -V_tw_boat.y };
     const TWA = relAngleDegFromBoatVec(V_tw_from_boat);
 
-    // outputs
+    // outputs (value)
     out.cog.textContent = fmtDeg(COG);
     out.sog.textContent = `${fmt(SOG, 2)} kn`;
 
@@ -288,6 +480,62 @@
     out.setDrift.textContent = `${fmtDeg(SET_to)} / ${fmt(DRIFT, 2)} kn`;
     out.gwdGwsEcho.textContent = `${fmtDeg(GWD_from)} / ${fmt(GWS, 2)} kn`;
 
+    // deltas
+    if (resetDelta || !state.prev) {
+      out.cogD.textContent = "—"; out.cogD.className = "mono delta zero";
+      out.sogD.textContent = "—"; out.sogD.className = "mono delta zero";
+      out.awaD.textContent = "—"; out.awaD.className = "mono delta zero";
+      out.awsD.textContent = "—"; out.awsD.className = "mono delta zero";
+      out.twaD.textContent = "—"; out.twaD.className = "mono delta zero";
+      out.twsD.textContent = "—"; out.twsD.className = "mono delta zero";
+      out.twdD.textContent = "—"; out.twdD.className = "mono delta zero";
+      out.setDriftD.textContent = "—"; out.setDriftD.className = "mono delta zero";
+      out.gwdGwsD.textContent = "—"; out.gwdGwsD.className = "mono delta zero";
+    } else {
+      setDeltaCell(out.cogD, angDiffDeg(COG, state.prev.COG), true);
+      setDeltaCell(out.sogD, SOG - state.prev.SOG, false, 2);
+
+      setDeltaCell(out.awaD, AWA - state.prev.AWA, true);
+      setDeltaCell(out.awsD, AWS - state.prev.AWS, false, 2);
+
+      setDeltaCell(out.twaD, TWA - state.prev.TWA, true);
+      setDeltaCell(out.twsD, TWS - state.prev.TWS, false, 2);
+      setDeltaCell(out.twdD, angDiffDeg(TWD_from, state.prev.TWD_from), true);
+
+      // combined fields: show two deltas compact
+      const dSet = angDiffDeg(SET_to, state.prev.SET_to);
+      const dDrift = DRIFT - state.prev.DRIFT;
+      out.setDriftD.classList.remove("pos","neg","zero");
+      if (!Number.isFinite(dSet) || !Number.isFinite(dDrift)) {
+        out.setDriftD.textContent = "—";
+        out.setDriftD.classList.add("zero");
+      } else {
+        const s1 = (Math.abs(dSet) < 0.5) ? "0°" : `${dSet > 0 ? "+" : ""}${dSet.toFixed(0)}°`;
+        const s2 = (Math.abs(dDrift) < 1e-9) ? "0" : `${dDrift > 0 ? "+" : ""}${dDrift.toFixed(2)}`;
+        out.setDriftD.textContent = `${s1} / ${s2}`;
+        // color by drift sign (most intuitive); zero -> muted
+        if (Math.abs(dDrift) < 1e-9) out.setDriftD.classList.add("zero");
+        else out.setDriftD.classList.add(dDrift > 0 ? "pos" : "neg");
+      }
+
+      const dGwd = angDiffDeg(GWD_from, state.prev.GWD_from);
+      const dGws = GWS - state.prev.GWS;
+      out.gwdGwsD.classList.remove("pos","neg","zero");
+      if (!Number.isFinite(dGwd) || !Number.isFinite(dGws)) {
+        out.gwdGwsD.textContent = "—";
+        out.gwdGwsD.classList.add("zero");
+      } else {
+        const s1 = (Math.abs(dGwd) < 0.5) ? "0°" : `${dGwd > 0 ? "+" : ""}${dGwd.toFixed(0)}°`;
+        const s2 = (Math.abs(dGws) < 1e-9) ? "0" : `${dGws > 0 ? "+" : ""}${dGws.toFixed(2)}`;
+        out.gwdGwsD.textContent = `${s1} / ${s2}`;
+        if (Math.abs(dGws) < 1e-9) out.gwdGwsD.classList.add("zero");
+        else out.gwdGwsD.classList.add(dGws > 0 ? "pos" : "neg");
+      }
+    }
+
+    // store prev
+    state.prev = { COG, SOG, AWA, AWS, TWA, TWS, TWD_from, SET_to, DRIFT, GWD_from, GWS };
+
     drawCanvas({ HDG, V_bw, V_cur, V_bg, V_gw, V_aw, V_tw });
   }
 
@@ -295,10 +543,13 @@
   const cv = el("cv");
   const ctx = cv.getContext("2d");
 
-  function drawArrow(origin, vNE, scale, label) {
+  function drawArrow(origin, vNE, scale, label, strokeFill) {
     const ox = origin.x, oy = origin.y;
     const x = ox + vNE.x * scale;
     const y = oy - vNE.y * scale;
+
+    ctx.strokeStyle = strokeFill;
+    ctx.fillStyle = strokeFill;
 
     ctx.beginPath();
     ctx.moveTo(ox, oy);
@@ -328,17 +579,18 @@
 
     ctx.clearRect(0, 0, cssW, cssH);
 
-    ctx.save();
-    ctx.globalAlpha = 0.7;
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(127,127,127,.55)";
-    ctx.fillStyle = "rgba(127,127,127,.55)";
-
     const origin = { x: cssW * 0.5, y: cssH * 0.62 };
+
+    // grid
+    ctx.save();
+    ctx.globalAlpha = 1.0;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = state.theme.grid;
+    ctx.fillStyle = state.theme.grid;
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
 
     ctx.beginPath(); ctx.moveTo(0, origin.y); ctx.lineTo(cssW, origin.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, cssH); ctx.stroke();
-
     ctx.fillText("E", cssW - 14, origin.y - 6);
     ctx.fillText("N", origin.x + 6, 14);
     ctx.restore();
@@ -355,27 +607,25 @@
     const scale = (Math.min(cssW, cssH) * 0.28) / maxSpd;
 
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(30,30,30,.9)";
-    ctx.fillStyle = "rgba(30,30,30,.9)";
     ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
 
     // boat & current
-    drawArrow(origin, V_bw, scale, "V_bw");
-    drawArrow(origin, V_cur, scale, "V_cur");
-    drawArrow(origin, V_bg, scale, "V_bg");
+    drawArrow(origin, V_bw, scale, "V_bw", state.theme.vec);
+    drawArrow(origin, V_cur, scale, "V_cur", state.theme.vec);
+    drawArrow(origin, V_bg, scale, "V_bg", state.theme.vec);
 
     // wind vectors from separate origin
     const wOrigin = { x: cssW * 0.5, y: cssH * 0.28 };
-    drawArrow(wOrigin, V_gw, scale, "V_gw");
-    drawArrow(wOrigin, V_aw, scale, "V_aw");
-    drawArrow(wOrigin, V_tw, scale, "V_tw");
+    drawArrow(wOrigin, V_gw, scale, "V_gw", state.theme.vec);
+    drawArrow(wOrigin, V_aw, scale, "V_aw", state.theme.vec);
+    drawArrow(wOrigin, V_tw, scale, "V_tw", state.theme.vec);
 
     // boat heading marker
     ctx.save();
     ctx.translate(origin.x, origin.y);
     ctx.rotate(deg2rad(HDG));
-    ctx.strokeStyle = "rgba(127,127,127,.85)";
-    ctx.fillStyle = "rgba(127,127,127,.85)";
+    ctx.strokeStyle = state.theme.hdg;
+    ctx.fillStyle = state.theme.hdg;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -385,9 +635,15 @@
     ctx.restore();
   }
 
+  // init
   setDefaults();
-  recalc();
-  window.addEventListener("resize", recalc);
+  readTheme();
+  recalc(true);
+
+  // resize + theme changes
+  window.addEventListener("resize", () => recalc(false));
+  const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq && mq.addEventListener) mq.addEventListener("change", () => recalc(false));
 })();
 </script>
 </body>
