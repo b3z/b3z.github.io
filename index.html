@@ -87,17 +87,12 @@
   </style>
 </head>
 <body>
-  <h1>Sailing Processor Model (GWD/GWS + BSP + SET/DRIFT)</h1>
+  <h1>Sailing Processor Model</h1>
 
   <div class="grid">
     <div class="card">
       <div class="small">
         Inputs: <span class="mono">GWD, GWS, HDG, BSP, SET, DRIFT</span>.
-        <br/>
-        Model:
-        <span class="mono">V_bg = V_bw + V_cur</span>,
-        <span class="mono">V_aw = V_gw - V_bg</span>,
-        <span class="mono">V_tw = V_gw - V_cur</span>.
         <br/>
         Wind dirs are <span class="mono">FROM</span>, boat/current dirs are <span class="mono">TO</span>.
       </div>
@@ -173,7 +168,7 @@
           <button class="pmBtn" id="driftP" aria-label="DRIFT plus">+</button>
         </div>
       </div>
-      <input id="drift" type="range" min="0" max="6" step="1" />
+      <input id="drift" type="range" min="0" max="12" step="1" />
 
       <div class="toolbar">
         <button id="baseline">Set baseline</button>
@@ -383,7 +378,7 @@
     inputs.bsp.value = "8"; inputs.bspN.value = "8";
     inputs.gwd.value = "0"; inputs.gwdN.value = "0";
     inputs.gws.value = "14"; inputs.gwsN.value = "14";
-    inputs.set.value = "135"; inputs.setN.value = "135";
+    inputs.set.value = "0"; inputs.setN.value = "0";
     inputs.drift.value = "0"; inputs.driftN.value = "0";
   }
 
@@ -629,7 +624,7 @@
     ctx.globalAlpha = 1;
     ctx.fillStyle = state.theme.hdg;
     ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
-    ctx.fillText("HDG", 10, -L - 6);
+    ctx.fillText("", 10, -L - 6);
 
     ctx.restore();
   }
