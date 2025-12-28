@@ -8,14 +8,12 @@
     :root {
       color-scheme: light dark;
 
-      /* UI + canvas theme tokens */
       --border: rgba(127,127,127,.35);
       --border2: rgba(127,127,127,.25);
-      --muted: rgba(127,127,127,.85);
       --bgCanvas: rgba(127,127,127,.06);
 
       --vec: rgba(30,30,30,.92);
-      --grid: rgba(127,127,127,.55);
+      --grid: rgba(127,127,127,.45);
       --hdg: rgba(127,127,127,.85);
 
       --pos: #1a8f3a;
@@ -26,11 +24,10 @@
       :root {
         --border: rgba(255,255,255,.18);
         --border2: rgba(255,255,255,.12);
-        --muted: rgba(255,255,255,.78);
         --bgCanvas: rgba(255,255,255,.06);
 
         --vec: rgba(245,245,245,.92);
-        --grid: rgba(255,255,255,.25);
+        --grid: rgba(255,255,255,.22);
         --hdg: rgba(255,255,255,.60);
 
         --pos: #47d16a;
@@ -46,7 +43,6 @@
     label { font-size: 12px; opacity: 0.9; }
     input[type="range"] { width: 100%; }
 
-    /* Number input: hide native steppers so user uses +/- buttons */
     input[type="number"] {
       width: 100%;
       box-sizing: border-box;
@@ -74,7 +70,7 @@
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 6px 8px; border-bottom: 1px solid var(--border2); }
     th { text-align: left; font-weight: 650; opacity: .9; }
-    td:first-child { opacity: .85; width: 38%; }
+    td:first-child { opacity: .85; width: 28%; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
     .pill { display:inline-block; padding: 3px 8px; border-radius: 999px; border:1px solid var(--border); font-size: 12px; }
     .toolbar { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; margin-top: 8px; }
@@ -83,11 +79,11 @@
     .numCtl { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: center; }
     .pmBtn { padding: 10px 0; font-weight: 700; font-size: 18px; line-height: 1; }
 
-    .delta { width: 22%; opacity: .9; }
-    .delta.mono { font-variant-numeric: tabular-nums; }
+    .delta { opacity: .9; }
+    .delta.mono, .base.mono { font-variant-numeric: tabular-nums; }
     .delta.pos { color: var(--pos); }
     .delta.neg { color: var(--neg); }
-    .delta.zero { opacity: .55; }
+    .delta.zero, .base.zero { opacity: .55; }
   </style>
 </head>
 <body>
@@ -197,35 +193,31 @@
         <thead>
           <tr>
             <th>Key</th>
+            <th class="mono">Baseline</th>
             <th class="mono">Value</th>
             <th class="mono">Δ</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>COG</td><td class="mono" id="cog"></td><td class="mono delta" id="cogD"></td></tr>
-          <tr><td>SOG</td><td class="mono" id="sog"></td><td class="mono delta" id="sogD"></td></tr>
+          <tr><td>COG</td><td class="mono base" id="cogB"></td><td class="mono" id="cog"></td><td class="mono delta" id="cogD"></td></tr>
+          <tr><td>SOG</td><td class="mono base" id="sogB"></td><td class="mono" id="sog"></td><td class="mono delta" id="sogD"></td></tr>
 
-          <tr><td>AWA</td><td class="mono" id="awa"></td><td class="mono delta" id="awaD"></td></tr>
-          <tr><td>AWS</td><td class="mono" id="aws"></td><td class="mono delta" id="awsD"></td></tr>
+          <tr><td>AWA</td><td class="mono base" id="awaB"></td><td class="mono" id="awa"></td><td class="mono delta" id="awaD"></td></tr>
+          <tr><td>AWS</td><td class="mono base" id="awsB"></td><td class="mono" id="aws"></td><td class="mono delta" id="awsD"></td></tr>
 
-          <tr><td>TWA</td><td class="mono" id="twa"></td><td class="mono delta" id="twaD"></td></tr>
-          <tr><td>TWS</td><td class="mono" id="twsOut"></td><td class="mono delta" id="twsD"></td></tr>
-          <tr><td>TWD</td><td class="mono" id="twdOut"></td><td class="mono delta" id="twdD"></td></tr>
+          <tr><td>TWA</td><td class="mono base" id="twaB"></td><td class="mono" id="twa"></td><td class="mono delta" id="twaD"></td></tr>
+          <tr><td>TWS</td><td class="mono base" id="twsB"></td><td class="mono" id="twsOut"></td><td class="mono delta" id="twsD"></td></tr>
+          <tr><td>TWD</td><td class="mono base" id="twdB"></td><td class="mono" id="twdOut"></td><td class="mono delta" id="twdD"></td></tr>
 
-          <tr><td>SET/DRIFT</td><td class="mono" id="setDrift"></td><td class="mono delta" id="setDriftD"></td></tr>
-          <tr><td>GWD/GWS</td><td class="mono" id="gwdGwsEcho"></td><td class="mono delta" id="gwdGwsD"></td></tr>
+          <tr><td>SET/DRIFT</td><td class="mono base" id="setDriftB"></td><td class="mono" id="setDrift"></td><td class="mono delta" id="setDriftD"></td></tr>
+          <tr><td>GWD/GWS</td><td class="mono base" id="gwdGwsB"></td><td class="mono" id="gwdGwsEcho"></td><td class="mono delta" id="gwdGwsD"></td></tr>
         </tbody>
       </table>
 
-      <div class="small" style="margin-top:10px;">
-        Canvas vectors:
-        <span class="mono">V_bw</span> (BSP),
-        <span class="mono">V_cur</span>,
-        <span class="mono">V_bg</span>,
-        <span class="mono">V_gw</span> (from GWD/GWS),
-        <span class="mono">V_aw</span>,
-        <span class="mono">V_tw</span> (over water).
-      </div>
+      <!-- <div class="small" style="margin-top:10px;"> -->
+      <!--   Canvas: boat + <span class="mono">V_bg</span> (thick), <span class="mono">V_bw</span> (dashed), <span class="mono">V_cur</span> (thin), <span class="mono">V_aw(FROM)</span>. -->
+      <!--   Inset: <span class="mono">V_gw(FROM)</span>. -->
+      <!-- </div> -->
 
       <div style="margin-top:10px;">
         <canvas id="cv" width="980" height="520"></canvas>
@@ -240,27 +232,23 @@
   const rad2deg = r => r * 180 / Math.PI;
   const wrap360 = d => (d % 360 + 360) % 360;
 
-  // shortest signed angle difference (a - b) in [-180, 180)
   function angDiffDeg(a, b) {
     let d = ((a - b + 540) % 360) - 180;
     if (d === -180) d = 180;
     return d;
   }
 
-  // Bearing (deg true, TO) -> NE vector (x=E, y=N)
   function vecFromBearingTo(bearingDeg, speed) {
     const a = deg2rad(bearingDeg);
     return { x: speed * Math.sin(a), y: speed * Math.cos(a) };
   }
 
-  // NE vector -> bearing (deg true, TO) + speed
   function bearingToFromVec(v) {
     const spd = Math.hypot(v.x, v.y);
     const brg = wrap360(rad2deg(Math.atan2(v.x, v.y)));
     return { bearing: brg, speed: spd };
   }
 
-  // NE -> boat frame: x=forward, y=starboard (right)
   function vecNEToBoat(vNE, hdgDeg) {
     const a = deg2rad(hdgDeg);
     const forward =  vNE.x * Math.sin(a) + vNE.y * Math.cos(a);
@@ -268,18 +256,15 @@
     return { x: forward, y: starbd };
   }
 
-  // Wind dir FROM (meteo) -> NE vector TO (add 180)
   function windVecFromDirFrom(dirFromDeg, speed) {
     return vecFromBearingTo(wrap360(dirFromDeg + 180), speed);
   }
 
-  // NE wind vector TO -> wind dir FROM
   function windDirFromVec(v) {
     const { bearing } = bearingToFromVec(v);
     return wrap360(bearing + 180);
   }
 
-  // Boat-relative angle: 0=bows, +starboard, -port (using wind FROM vector in boat frame)
   function relAngleDegFromBoatVec(vBoat) {
     const ang = rad2deg(Math.atan2(vBoat.y, vBoat.x));
     return ((ang + 180) % 360) - 180;
@@ -315,11 +300,18 @@
     twaD: el("twaD"), twsD: el("twsD"), twdD: el("twdD"),
     setDriftD: el("setDriftD"),
     gwdGwsD: el("gwdGwsD"),
+
+    // baseline column
+    cogB: el("cogB"), sogB: el("sogB"),
+    awaB: el("awaB"), awsB: el("awsB"),
+    twaB: el("twaB"), twsB: el("twsB"), twdB: el("twdB"),
+    setDriftB: el("setDriftB"),
+    gwdGwsB: el("gwdGwsB"),
   };
 
   const state = {
-    baseline: null,       // snapshot used for Δ
-    lastComputed: null,   // latest snapshot (so baseline button can capture it)
+    baseline: null,
+    lastComputed: null,
     theme: null
   };
 
@@ -327,7 +319,7 @@
     const cs = getComputedStyle(document.documentElement);
     state.theme = {
       vec: cs.getPropertyValue("--vec").trim() || "rgba(30,30,30,.92)",
-      grid: cs.getPropertyValue("--grid").trim() || "rgba(127,127,127,.55)",
+      grid: cs.getPropertyValue("--grid").trim() || "rgba(127,127,127,.45)",
       hdg: cs.getPropertyValue("--hdg").trim() || "rgba(127,127,127,.85)",
     };
   }
@@ -338,7 +330,6 @@
       if (!Number.isFinite(v)) return Number(rangeEl.value);
       return Math.min(max, Math.max(min, v));
     }
-
     function syncFromRange() { numEl.value = rangeEl.value; recalc(); }
     function syncFromNum() {
       const v = clampToRange(Number(numEl.value));
@@ -346,11 +337,8 @@
       numEl.value = String(v);
       recalc();
     }
-
     rangeEl.addEventListener("input", syncFromRange);
     numEl.addEventListener("input", syncFromNum);
-
-    return { clampToRange, syncFromNum };
   }
 
   bindRangeAndNumber(inputs.hdg, inputs.hdgN);
@@ -367,10 +355,8 @@
     const cur = Number(rangeEl.value);
     let next = cur + dir * step;
 
-    // wrap angles
     if (key === "hdg" || key === "gwd" || key === "set") next = wrap360(next);
 
-    // clamp others
     const min = Number(rangeEl.min), max = Number(rangeEl.max);
     if (!(key === "hdg" || key === "gwd" || key === "set")) next = Math.min(max, Math.max(min, next));
 
@@ -379,7 +365,6 @@
     recalc();
   }
 
-  // plus/minus button wiring
   inputs.hdgM.addEventListener("click", () => nudge("hdg", -1));
   inputs.hdgP.addEventListener("click", () => nudge("hdg", +1));
   inputs.bspM.addEventListener("click", () => nudge("bsp", -1));
@@ -402,6 +387,33 @@
     inputs.drift.value = "0"; inputs.driftN.value = "0";
   }
 
+  function setDeltaCell(cell, delta, isAngle=false, digits=2) {
+    cell.classList.remove("pos", "neg", "zero");
+    if (!Number.isFinite(delta)) { cell.textContent = "—"; cell.classList.add("zero"); return; }
+    const eps = isAngle ? 0.5 : 1e-9;
+    if (Math.abs(delta) < eps) { cell.textContent = "0"; cell.classList.add("zero"); return; }
+    const sign = delta > 0 ? "+" : "";
+    const txt = isAngle ? `${sign}${delta.toFixed(0)}°` : `${sign}${delta.toFixed(digits)}`;
+    cell.textContent = txt;
+    cell.classList.add(delta > 0 ? "pos" : "neg");
+  }
+
+  function setBaseCell(cell, txt) {
+    cell.classList.remove("zero");
+    cell.textContent = txt;
+    if (txt === "—") cell.classList.add("zero");
+  }
+
+  function clearDeltasAndBaselineCols() {
+    // baseline col
+    for (const k of ["cogB","sogB","awaB","awsB","twaB","twsB","twdB","setDriftB","gwdGwsB"]) setBaseCell(out[k], "—");
+    // delta col
+    for (const k of ["cogD","sogD","awaD","awsD","twaD","twsD","twdD","setDriftD","gwdGwsD"]) {
+      out[k].textContent = "—";
+      out[k].className = "mono delta zero";
+    }
+  }
+
   function setBaselineSnapshot(snap) {
     state.baseline = { ...snap };
     const t = new Date();
@@ -410,10 +422,9 @@
   }
 
   inputs.baseline.addEventListener("click", () => {
-    // ensure we have a fresh snapshot
-    recalc(false);
+    recalc(false); // refresh lastComputed
     if (state.lastComputed) setBaselineSnapshot(state.lastComputed);
-    recalc(false);
+    recalc(false); // redraw with baseline column + deltas
   });
 
   inputs.reset.addEventListener("click", () => {
@@ -423,31 +434,6 @@
     inputs.baselineInfo.textContent = "";
     recalc(true);
   });
-
-  function setDeltaCell(cell, delta, isAngle=false, digits=2) {
-    cell.classList.remove("pos", "neg", "zero");
-    if (!Number.isFinite(delta)) { cell.textContent = "—"; cell.classList.add("zero"); return; }
-
-    const eps = isAngle ? 0.5 : 1e-9;
-    if (Math.abs(delta) < eps) { cell.textContent = "0"; cell.classList.add("zero"); return; }
-
-    const sign = delta > 0 ? "+" : "";
-    const txt = isAngle ? `${sign}${delta.toFixed(0)}°` : `${sign}${delta.toFixed(digits)}`;
-    cell.textContent = txt;
-    cell.classList.add(delta > 0 ? "pos" : "neg");
-  }
-
-  function clearDeltas() {
-    out.cogD.textContent = "—"; out.cogD.className = "mono delta zero";
-    out.sogD.textContent = "—"; out.sogD.className = "mono delta zero";
-    out.awaD.textContent = "—"; out.awaD.className = "mono delta zero";
-    out.awsD.textContent = "—"; out.awsD.className = "mono delta zero";
-    out.twaD.textContent = "—"; out.twaD.className = "mono delta zero";
-    out.twsD.textContent = "—"; out.twsD.className = "mono delta zero";
-    out.twdD.textContent = "—"; out.twdD.className = "mono delta zero";
-    out.setDriftD.textContent = "—"; out.setDriftD.className = "mono delta zero";
-    out.gwdGwsD.textContent = "—"; out.gwdGwsD.className = "mono delta zero";
-  }
 
   function recalc(resetDelta=false) {
     readTheme();
@@ -474,25 +460,24 @@
     const SOG = bg.speed;
 
     // ground wind: given as FROM, stored as TO vector
-    const V_gw = windVecFromDirFrom(GWD_from, GWS);
+    const V_gw_to = windVecFromDirFrom(GWD_from, GWS);
+    const V_gw_from = { x: -V_gw_to.x, y: -V_gw_to.y };
 
     // apparent wind at the boat (TO)
-    const V_aw = { x: V_gw.x - V_bg.x, y: V_gw.y - V_bg.y };
-    const V_aw_boat = vecNEToBoat(V_aw, HDG);
+    const V_aw_to = { x: V_gw_to.x - V_bg.x, y: V_gw_to.y - V_bg.y };
+    const V_aw_from = { x: -V_aw_to.x, y: -V_aw_to.y };
+    const V_aw_boat_to = vecNEToBoat(V_aw_to, HDG);
+    const V_aw_from_boat = { x: -V_aw_boat_to.x, y: -V_aw_boat_to.y };
 
-    // IMPORTANT: AWA is wind FROM relative to bow
-    const V_aw_from_boat = { x: -V_aw_boat.x, y: -V_aw_boat.y };
-
-    const AWS = Math.hypot(V_aw_boat.x, V_aw_boat.y);
+    const AWS = Math.hypot(V_aw_boat_to.x, V_aw_boat_to.y);
     const AWA = relAngleDegFromBoatVec(V_aw_from_boat);
 
     // true wind over water (TO)
-    const V_tw = { x: V_gw.x - V_cur.x, y: V_gw.y - V_cur.y };
-    const TWS = Math.hypot(V_tw.x, V_tw.y);
-    const TWD_from = windDirFromVec(V_tw);
+    const V_tw_to = { x: V_gw_to.x - V_cur.x, y: V_gw_to.y - V_cur.y };
+    const TWS = Math.hypot(V_tw_to.x, V_tw_to.y);
+    const TWD_from = windDirFromVec(V_tw_to);
 
-    // TWA is wind FROM relative to bow
-    const V_tw_boat = vecNEToBoat(V_tw, HDG);
+    const V_tw_boat = vecNEToBoat(V_tw_to, HDG);
     const V_tw_from_boat = { x: -V_tw_boat.x, y: -V_tw_boat.y };
     const TWA = relAngleDegFromBoatVec(V_tw_from_boat);
 
@@ -510,16 +495,29 @@
     out.setDrift.textContent = `${fmtDeg(SET_to)} / ${fmt(DRIFT, 2)} kn`;
     out.gwdGwsEcho.textContent = `${fmtDeg(GWD_from)} / ${fmt(GWS, 2)} kn`;
 
-    // snapshot for baseline
     const snap = { COG, SOG, AWA, AWS, TWA, TWS, TWD_from, SET_to, DRIFT, GWD_from, GWS };
     state.lastComputed = snap;
 
-    // deltas vs baseline
-    if (resetDelta || !state.baseline) {
-      clearDeltas();
+    if (resetDelta) {
+      clearDeltasAndBaselineCols();
+    } else if (!state.baseline) {
+      // baseline not set => show — in baseline & delta cols
+      clearDeltasAndBaselineCols();
     } else {
       const b = state.baseline;
 
+      // baseline column
+      setBaseCell(out.cogB, `${fmtDeg(b.COG)}`);
+      setBaseCell(out.sogB, `${fmt(b.SOG,2)} kn`);
+      setBaseCell(out.awaB, `${fmtDegSigned(b.AWA)}`);
+      setBaseCell(out.awsB, `${fmt(b.AWS,2)} kn`);
+      setBaseCell(out.twaB, `${fmtDegSigned(b.TWA)}`);
+      setBaseCell(out.twsB, `${fmt(b.TWS,2)} kn`);
+      setBaseCell(out.twdB, `${fmtDeg(b.TWD_from)}`);
+      setBaseCell(out.setDriftB, `${fmtDeg(b.SET_to)} / ${fmt(b.DRIFT,2)} kn`);
+      setBaseCell(out.gwdGwsB, `${fmtDeg(b.GWD_from)} / ${fmt(b.GWS,2)} kn`);
+
+      // deltas vs baseline
       setDeltaCell(out.cogD, angDiffDeg(COG, b.COG), true);
       setDeltaCell(out.sogD, SOG - b.SOG, false, 2);
 
@@ -551,20 +549,33 @@
       else out.gwdGwsD.classList.add(dGws > 0 ? "pos" : "neg");
     }
 
-    drawCanvas({ HDG, V_bw, V_cur, V_bg, V_gw, V_aw, V_tw });
+    drawCanvas({
+      HDG,
+      V_bw,
+      V_cur,
+      V_bg,
+      V_aw_from,
+      V_gw_from,
+      GWD_from,
+      GWS
+    });
   }
 
   // ---------- canvas ----------
   const cv = el("cv");
   const ctx = cv.getContext("2d");
 
-  function drawArrow(origin, vNE, scale, label, strokeFill) {
+  function drawArrow(origin, vNE, scale, label, style={}) {
     const ox = origin.x, oy = origin.y;
     const x = ox + vNE.x * scale;
     const y = oy - vNE.y * scale;
 
-    ctx.strokeStyle = strokeFill;
-    ctx.fillStyle = strokeFill;
+    ctx.save();
+    ctx.strokeStyle = style.stroke || state.theme.vec;
+    ctx.fillStyle = style.fill || state.theme.vec;
+    ctx.lineWidth = style.width ?? 2;
+    ctx.globalAlpha = style.alpha ?? 1;
+    if (style.dash) ctx.setLineDash(style.dash);
 
     ctx.beginPath();
     ctx.moveTo(ox, oy);
@@ -572,7 +583,7 @@
     ctx.stroke();
 
     const ang = Math.atan2(y - oy, x - ox);
-    const ah = 10;
+    const ah = style.head ?? 10;
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(x - ah * Math.cos(ang - Math.PI/7), y - ah * Math.sin(ang - Math.PI/7));
@@ -580,11 +591,85 @@
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillText(label, x + 6, y + 4);
+    if (label) {
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+      ctx.fillText(label, x + 6, y + 4);
+    }
+    ctx.restore();
+  }
+
+  function drawBoat(origin, hdgDeg) {
+    ctx.save();
+    ctx.translate(origin.x, origin.y);
+    ctx.rotate(deg2rad(hdgDeg));
+    ctx.strokeStyle = state.theme.vec;
+    ctx.fillStyle = state.theme.vec;
+
+    // simple hull (triangle-ish)
+    const L = 26, W = 14;
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -L);
+    ctx.lineTo(W, L * 0.65);
+    ctx.lineTo(0, L * 0.35);
+    ctx.lineTo(-W, L * 0.65);
+    ctx.closePath();
+    ctx.stroke();
+
+    // centerline / bow mark
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(0, 10);
+    ctx.lineTo(0, -L - 8);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = state.theme.hdg;
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+    ctx.fillText("HDG", 10, -L - 6);
+
+    ctx.restore();
+  }
+
+  function drawInsetWind(box, V_gw_from, GWD_from, GWS) {
+    ctx.save();
+
+    // box
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = state.theme.grid;
+    ctx.fillStyle = "transparent";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(box.x, box.y, box.w, box.h, 10);
+    ctx.stroke();
+
+    // title
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = state.theme.vec;
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+    ctx.fillText(`GWD/GWS ${wrap360(GWD_from).toFixed(0)}° / ${Number(GWS).toFixed(1)} kn`, box.x + 10, box.y + 18);
+
+    // tiny compass cross
+    const cx = box.x + box.w * 0.5;
+    const cy = box.y + box.h * 0.62;
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = state.theme.grid;
+    ctx.beginPath(); ctx.moveTo(box.x + 10, cy); ctx.lineTo(box.x + box.w - 10, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, box.y + 30); ctx.lineTo(cx, box.y + box.h - 10); ctx.stroke();
+
+    // arrow scaled to box
+    const maxSpd = Math.max(1, Math.hypot(V_gw_from.x, V_gw_from.y));
+    const scale = (Math.min(box.w, box.h) * 0.28) / maxSpd;
+    drawArrow({ x: cx, y: cy }, V_gw_from, scale, "GW", { width: 2, alpha: 1 });
+
+    ctx.restore();
   }
 
   function drawCanvas(s) {
-    const { HDG, V_bw, V_cur, V_bg, V_gw, V_aw, V_tw } = s;
+    const { HDG, V_bw, V_cur, V_bg, V_aw_from, V_gw_from, GWD_from, GWS } = s;
 
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const cssW = cv.clientWidth, cssH = cv.clientHeight;
@@ -594,60 +679,40 @@
 
     ctx.clearRect(0, 0, cssW, cssH);
 
-    const origin = { x: cssW * 0.5, y: cssH * 0.62 };
+    // main origin (boat)
+    const origin = { x: cssW * 0.42, y: cssH * 0.62 };
 
-    // grid
+    // light grid (less dominant)
     ctx.save();
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = 0.6;
     ctx.lineWidth = 1;
     ctx.strokeStyle = state.theme.grid;
-    ctx.fillStyle = state.theme.grid;
-    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
-
     ctx.beginPath(); ctx.moveTo(0, origin.y); ctx.lineTo(cssW, origin.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, cssH); ctx.stroke();
-    ctx.fillText("E", cssW - 14, origin.y - 6);
-    ctx.fillText("N", origin.x + 6, 14);
     ctx.restore();
 
+    // scaling based on the few vectors we draw
     const maxSpd = Math.max(
       1,
-      Math.hypot(V_bw.x, V_bw.y),
       Math.hypot(V_bg.x, V_bg.y),
+      Math.hypot(V_bw.x, V_bw.y),
       Math.hypot(V_cur.x, V_cur.y),
-      Math.hypot(V_gw.x, V_gw.y),
-      Math.hypot(V_aw.x, V_aw.y),
-      Math.hypot(V_tw.x, V_tw.y)
+      Math.hypot(V_aw_from.x, V_aw_from.y)
     );
-    const scale = (Math.min(cssW, cssH) * 0.28) / maxSpd;
+    const scale = (Math.min(cssW, cssH) * 0.34) / maxSpd;
 
-    ctx.lineWidth = 2;
-    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
+    // vectors (monochrome, different line styles to reduce clutter)
+    drawArrow(origin, V_bg, scale, "COG", { width: 3, alpha: 1 });
+    drawArrow(origin, V_bw, scale, "BSP", { width: 2, alpha: 0.7, dash: [8, 6] });
+    drawArrow(origin, V_cur, scale, "cur", { width: 2, alpha: 0.55, dash: [2, 6] });
+    drawArrow(origin, V_aw_from, scale, "AW", { width: 1, alpha: 0.3 });
 
-    // boat & current
-    drawArrow(origin, V_bw, scale, "V_bw", state.theme.vec);
-    drawArrow(origin, V_cur, scale, "V_cur", state.theme.vec);
-    drawArrow(origin, V_bg, scale, "V_bg", state.theme.vec);
+    // boat
+    drawBoat(origin, HDG);
 
-    // wind vectors from separate origin
-    const wOrigin = { x: cssW * 0.5, y: cssH * 0.28 };
-    drawArrow(wOrigin, V_gw, scale, "V_gw", state.theme.vec);
-    drawArrow(wOrigin, V_aw, scale, "V_aw", state.theme.vec);
-    drawArrow(wOrigin, V_tw, scale, "V_tw", state.theme.vec);
-
-    // boat heading marker
-    ctx.save();
-    ctx.translate(origin.x, origin.y);
-    ctx.rotate(deg2rad(HDG));
-    ctx.strokeStyle = state.theme.hdg;
-    ctx.fillStyle = state.theme.hdg;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, -36);
-    ctx.stroke();
-    ctx.fillText("HDG", 6, -30);
-    ctx.restore();
+    // inset top-right: ground wind
+    const box = { x: cssW - 240, y: 16, w: 224, h: 150 };
+    drawInsetWind(box, V_gw_from, GWD_from, GWS);
   }
 
   // init
