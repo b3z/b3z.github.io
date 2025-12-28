@@ -180,7 +180,9 @@
       <input id="drift" type="range" min="0" max="6" step="1" />
 
       <div class="toolbar">
+        <button id="baseline">Set baseline</button>
         <button id="reset">Reset</button>
+        <span class="small" id="baselineInfo" style="margin-left:auto;"></span>
       </div>
 
       <div class="small" style="margin-top:10px;">
@@ -241,7 +243,6 @@
   // shortest signed angle difference (a - b) in [-180, 180)
   function angDiffDeg(a, b) {
     let d = ((a - b + 540) % 360) - 180;
-    // avoid showing -180 when +180 is equally valid
     if (d === -180) d = 180;
     return d;
   }
@@ -297,6 +298,8 @@
     gws: el("gws"), gwsN: el("gwsN"), gwsM: el("gwsM"), gwsP: el("gwsP"),
     set: el("set"), setN: el("setN"), setM: el("setM"), setP: el("setP"),
     drift: el("drift"), driftN: el("driftN"), driftM: el("driftM"), driftP: el("driftP"),
+    baseline: el("baseline"),
+    baselineInfo: el("baselineInfo"),
     reset: el("reset")
   };
 
@@ -315,7 +318,8 @@
   };
 
   const state = {
-    prev: null,
+    baseline: null,       // snapshot used for Δ
+    lastComputed: null,   // latest snapshot (so baseline button can capture it)
     theme: null
   };
 
@@ -349,14 +353,12 @@
     return { clampToRange, syncFromNum };
   }
 
-  const binders = {
-    hdg: bindRangeAndNumber(inputs.hdg, inputs.hdgN),
-    bsp: bindRangeAndNumber(inputs.bsp, inputs.bspN),
-    gwd: bindRangeAndNumber(inputs.gwd, inputs.gwdN),
-    gws: bindRangeAndNumber(inputs.gws, inputs.gwsN),
-    set: bindRangeAndNumber(inputs.set, inputs.setN),
-    drift: bindRangeAndNumber(inputs.drift, inputs.driftN),
-  };
+  bindRangeAndNumber(inputs.hdg, inputs.hdgN);
+  bindRangeAndNumber(inputs.bsp, inputs.bspN);
+  bindRangeAndNumber(inputs.gwd, inputs.gwdN);
+  bindRangeAndNumber(inputs.gws, inputs.gwsN);
+  bindRangeAndNumber(inputs.set, inputs.setN);
+  bindRangeAndNumber(inputs.drift, inputs.driftN);
 
   function nudge(key, dir) {
     const rangeEl = inputs[key];
@@ -366,15 +368,11 @@
     let next = cur + dir * step;
 
     // wrap angles
-    if (key === "hdg" || key === "gwd" || key === "set") {
-      next = wrap360(next);
-    }
+    if (key === "hdg" || key === "gwd" || key === "set") next = wrap360(next);
 
     // clamp others
     const min = Number(rangeEl.min), max = Number(rangeEl.max);
-    if (!(key === "hdg" || key === "gwd" || key === "set")) {
-      next = Math.min(max, Math.max(min, next));
-    }
+    if (!(key === "hdg" || key === "gwd" || key === "set")) next = Math.min(max, Math.max(min, next));
 
     rangeEl.value = String(next);
     numEl.value = String(next);
@@ -395,8 +393,6 @@
   inputs.driftM.addEventListener("click", () => nudge("drift", -1));
   inputs.driftP.addEventListener("click", () => nudge("drift", +1));
 
-  inputs.reset.addEventListener("click", () => { setDefaults(); recalc(true); });
-
   function setDefaults() {
     inputs.hdg.value = "318"; inputs.hdgN.value = "318";
     inputs.bsp.value = "8"; inputs.bspN.value = "8";
@@ -405,6 +401,28 @@
     inputs.set.value = "135"; inputs.setN.value = "135";
     inputs.drift.value = "0"; inputs.driftN.value = "0";
   }
+
+  function setBaselineSnapshot(snap) {
+    state.baseline = { ...snap };
+    const t = new Date();
+    inputs.baselineInfo.textContent =
+      `baseline @ ${t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+  }
+
+  inputs.baseline.addEventListener("click", () => {
+    // ensure we have a fresh snapshot
+    recalc(false);
+    if (state.lastComputed) setBaselineSnapshot(state.lastComputed);
+    recalc(false);
+  });
+
+  inputs.reset.addEventListener("click", () => {
+    setDefaults();
+    state.baseline = null;
+    state.lastComputed = null;
+    inputs.baselineInfo.textContent = "";
+    recalc(true);
+  });
 
   function setDeltaCell(cell, delta, isAngle=false, digits=2) {
     cell.classList.remove("pos", "neg", "zero");
@@ -417,6 +435,18 @@
     const txt = isAngle ? `${sign}${delta.toFixed(0)}°` : `${sign}${delta.toFixed(digits)}`;
     cell.textContent = txt;
     cell.classList.add(delta > 0 ? "pos" : "neg");
+  }
+
+  function clearDeltas() {
+    out.cogD.textContent = "—"; out.cogD.className = "mono delta zero";
+    out.sogD.textContent = "—"; out.sogD.className = "mono delta zero";
+    out.awaD.textContent = "—"; out.awaD.className = "mono delta zero";
+    out.awsD.textContent = "—"; out.awsD.className = "mono delta zero";
+    out.twaD.textContent = "—"; out.twaD.className = "mono delta zero";
+    out.twsD.textContent = "—"; out.twsD.className = "mono delta zero";
+    out.twdD.textContent = "—"; out.twdD.className = "mono delta zero";
+    out.setDriftD.textContent = "—"; out.setDriftD.className = "mono delta zero";
+    out.gwdGwsD.textContent = "—"; out.gwdGwsD.className = "mono delta zero";
   }
 
   function recalc(resetDelta=false) {
@@ -480,61 +510,46 @@
     out.setDrift.textContent = `${fmtDeg(SET_to)} / ${fmt(DRIFT, 2)} kn`;
     out.gwdGwsEcho.textContent = `${fmtDeg(GWD_from)} / ${fmt(GWS, 2)} kn`;
 
-    // deltas
-    if (resetDelta || !state.prev) {
-      out.cogD.textContent = "—"; out.cogD.className = "mono delta zero";
-      out.sogD.textContent = "—"; out.sogD.className = "mono delta zero";
-      out.awaD.textContent = "—"; out.awaD.className = "mono delta zero";
-      out.awsD.textContent = "—"; out.awsD.className = "mono delta zero";
-      out.twaD.textContent = "—"; out.twaD.className = "mono delta zero";
-      out.twsD.textContent = "—"; out.twsD.className = "mono delta zero";
-      out.twdD.textContent = "—"; out.twdD.className = "mono delta zero";
-      out.setDriftD.textContent = "—"; out.setDriftD.className = "mono delta zero";
-      out.gwdGwsD.textContent = "—"; out.gwdGwsD.className = "mono delta zero";
+    // snapshot for baseline
+    const snap = { COG, SOG, AWA, AWS, TWA, TWS, TWD_from, SET_to, DRIFT, GWD_from, GWS };
+    state.lastComputed = snap;
+
+    // deltas vs baseline
+    if (resetDelta || !state.baseline) {
+      clearDeltas();
     } else {
-      setDeltaCell(out.cogD, angDiffDeg(COG, state.prev.COG), true);
-      setDeltaCell(out.sogD, SOG - state.prev.SOG, false, 2);
+      const b = state.baseline;
 
-      setDeltaCell(out.awaD, AWA - state.prev.AWA, true);
-      setDeltaCell(out.awsD, AWS - state.prev.AWS, false, 2);
+      setDeltaCell(out.cogD, angDiffDeg(COG, b.COG), true);
+      setDeltaCell(out.sogD, SOG - b.SOG, false, 2);
 
-      setDeltaCell(out.twaD, TWA - state.prev.TWA, true);
-      setDeltaCell(out.twsD, TWS - state.prev.TWS, false, 2);
-      setDeltaCell(out.twdD, angDiffDeg(TWD_from, state.prev.TWD_from), true);
+      setDeltaCell(out.awaD, AWA - b.AWA, true);
+      setDeltaCell(out.awsD, AWS - b.AWS, false, 2);
 
-      // combined fields: show two deltas compact
-      const dSet = angDiffDeg(SET_to, state.prev.SET_to);
-      const dDrift = DRIFT - state.prev.DRIFT;
+      setDeltaCell(out.twaD, TWA - b.TWA, true);
+      setDeltaCell(out.twsD, TWS - b.TWS, false, 2);
+      setDeltaCell(out.twdD, angDiffDeg(TWD_from, b.TWD_from), true);
+
+      // SET/DRIFT combined
+      const dSet = angDiffDeg(SET_to, b.SET_to);
+      const dDrift = DRIFT - b.DRIFT;
       out.setDriftD.classList.remove("pos","neg","zero");
-      if (!Number.isFinite(dSet) || !Number.isFinite(dDrift)) {
-        out.setDriftD.textContent = "—";
-        out.setDriftD.classList.add("zero");
-      } else {
-        const s1 = (Math.abs(dSet) < 0.5) ? "0°" : `${dSet > 0 ? "+" : ""}${dSet.toFixed(0)}°`;
-        const s2 = (Math.abs(dDrift) < 1e-9) ? "0" : `${dDrift > 0 ? "+" : ""}${dDrift.toFixed(2)}`;
-        out.setDriftD.textContent = `${s1} / ${s2}`;
-        // color by drift sign (most intuitive); zero -> muted
-        if (Math.abs(dDrift) < 1e-9) out.setDriftD.classList.add("zero");
-        else out.setDriftD.classList.add(dDrift > 0 ? "pos" : "neg");
-      }
+      const s1 = (Math.abs(dSet) < 0.5) ? "0°" : `${dSet > 0 ? "+" : ""}${dSet.toFixed(0)}°`;
+      const s2 = (Math.abs(dDrift) < 1e-9) ? "0" : `${dDrift > 0 ? "+" : ""}${dDrift.toFixed(2)}`;
+      out.setDriftD.textContent = `${s1} / ${s2}`;
+      if (Math.abs(dDrift) < 1e-9) out.setDriftD.classList.add("zero");
+      else out.setDriftD.classList.add(dDrift > 0 ? "pos" : "neg");
 
-      const dGwd = angDiffDeg(GWD_from, state.prev.GWD_from);
-      const dGws = GWS - state.prev.GWS;
+      // GWD/GWS combined
+      const dGwd = angDiffDeg(GWD_from, b.GWD_from);
+      const dGws = GWS - b.GWS;
       out.gwdGwsD.classList.remove("pos","neg","zero");
-      if (!Number.isFinite(dGwd) || !Number.isFinite(dGws)) {
-        out.gwdGwsD.textContent = "—";
-        out.gwdGwsD.classList.add("zero");
-      } else {
-        const s1 = (Math.abs(dGwd) < 0.5) ? "0°" : `${dGwd > 0 ? "+" : ""}${dGwd.toFixed(0)}°`;
-        const s2 = (Math.abs(dGws) < 1e-9) ? "0" : `${dGws > 0 ? "+" : ""}${dGws.toFixed(2)}`;
-        out.gwdGwsD.textContent = `${s1} / ${s2}`;
-        if (Math.abs(dGws) < 1e-9) out.gwdGwsD.classList.add("zero");
-        else out.gwdGwsD.classList.add(dGws > 0 ? "pos" : "neg");
-      }
+      const g1 = (Math.abs(dGwd) < 0.5) ? "0°" : `${dGwd > 0 ? "+" : ""}${dGwd.toFixed(0)}°`;
+      const g2 = (Math.abs(dGws) < 1e-9) ? "0" : `${dGws > 0 ? "+" : ""}${dGws.toFixed(2)}`;
+      out.gwdGwsD.textContent = `${g1} / ${g2}`;
+      if (Math.abs(dGws) < 1e-9) out.gwdGwsD.classList.add("zero");
+      else out.gwdGwsD.classList.add(dGws > 0 ? "pos" : "neg");
     }
-
-    // store prev
-    state.prev = { COG, SOG, AWA, AWS, TWA, TWS, TWD_from, SET_to, DRIFT, GWD_from, GWS };
 
     drawCanvas({ HDG, V_bw, V_cur, V_bg, V_gw, V_aw, V_tw });
   }
