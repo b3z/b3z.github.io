@@ -26,17 +26,19 @@
   </style>
 </head>
 <body>
-  <h1>Sailing Processor Model (GWD/GWS + STW + current)</h1>
+  <h1>Sailing Processor Model (GWD/GWS + BSP + SET/DRIFT)</h1>
 
   <div class="grid">
     <div class="card">
       <div class="small">
-        Inputs are: <span class="mono">GWD, GWS, HDG, BSP, SET, DRIFT</span>.
+        Inputs: <span class="mono">GWD, GWS, HDG, BSP, SET, DRIFT</span>.
         <br/>
         Model:
         <span class="mono">V_bg = V_bw + V_cur</span>,
         <span class="mono">V_aw = V_gw - V_bg</span>,
-        <span class="mono">V_tw(water) = V_gw - V_cur</span>.
+        <span class="mono">V_tw = V_gw - V_cur</span>.
+        <br/>
+        Wind dirs are <span class="mono">FROM</span>, boat/current dirs are <span class="mono">TO</span>.
       </div>
 
       <div class="toolbar">
@@ -54,9 +56,9 @@
 
       <div class="row">
         <label for="bsp">BSP</label>
-        <input id="bspN" type="number" step="0.1" />
+        <input id="bspN" type="number" step="1" />
       </div>
-      <input id="bsp" type="range" min="0" max="20" step="0.1" />
+      <input id="bsp" type="range" min="0" max="20" step="1" />
 
       <div class="row">
         <label for="gwd">GWD</label>
@@ -66,9 +68,9 @@
 
       <div class="row">
         <label for="gws">GWS</label>
-        <input id="gwsN" type="number" step="0.1" />
+        <input id="gwsN" type="number" step="1" />
       </div>
-      <input id="gws" type="range" min="0" max="60" step="0.1" />
+      <input id="gws" type="range" min="0" max="60" step="1" />
 
       <div class="row">
         <label for="set">SET</label>
@@ -78,19 +80,18 @@
 
       <div class="row">
         <label for="drift">DRIFT</label>
-        <input id="driftN" type="number" step="0.1" />
+        <input id="driftN" type="number" step="1" />
       </div>
-      <input id="drift" type="range" min="0" max="6" step="0.1" />
+      <input id="drift" type="range" min="0" max="6" step="1" />
 
       <div class="toolbar">
         <button id="reset">Reset</button>
       </div>
 
       <div class="small" style="margin-top:10px;">
-        Conventions:
-        <br/>• Boat + current dirs are “TO”.
-        <br/>• Wind dirs (GWD/TWD/AWD) are “FROM”.
-        <br/>• Internally wind “FROM” → vector “TO” by +180°.
+        AWA/TWA are signed in boat frame:
+        <br/>• <span class="mono">+</span> starboard, <span class="mono">-</span> port
+        <br/>• 0° = wind from straight ahead
       </div>
     </div>
 
@@ -102,7 +103,6 @@
 
           <tr><td>AWA</td><td class="mono" id="awa"></td></tr>
           <tr><td>AWS</td><td class="mono" id="aws"></td></tr>
-          <tr><td>AWD</td><td class="mono" id="awd"></td></tr>
 
           <tr><td>TWA</td><td class="mono" id="twa"></td></tr>
           <tr><td>TWS</td><td class="mono" id="twsOut"></td></tr>
@@ -168,7 +168,7 @@
     return wrap360(bearing + 180);
   }
 
-  // Boat-relative angle: 0=bows, +starboard, -port
+  // Boat-relative angle: 0=bows, +starboard, -port (using wind FROM vector in boat frame)
   function relAngleDegFromBoatVec(vBoat) {
     const ang = rad2deg(Math.atan2(vBoat.y, vBoat.x));
     return ((ang + 180) % 360) - 180;
@@ -192,7 +192,7 @@
 
   const out = {
     cog: el("cog"), sog: el("sog"),
-    awa: el("awa"), aws: el("aws"), awd: el("awd"),
+    awa: el("awa"), aws: el("aws"),
     twa: el("twa"), twsOut: el("twsOut"), twdOut: el("twdOut"),
     setDrift: el("setDrift"),
     gwdGwsEcho: el("gwdGwsEcho")
@@ -221,12 +221,12 @@
   inputs.reset.addEventListener("click", () => { setDefaults(); recalc(); });
 
   function setDefaults() {
-    inputs.hdg.value = "45"; inputs.hdgN.value = "45";
-    inputs.bsp.value = "8.0"; inputs.bspN.value = "8.0";
+    inputs.hdg.value = "318"; inputs.hdgN.value = "45";
+    inputs.bsp.value = "8"; inputs.bspN.value = "8.0";
     inputs.gwd.value = "0"; inputs.gwdN.value = "0";
     inputs.gws.value = "14.0"; inputs.gwsN.value = "14.0";
     inputs.set.value = "135"; inputs.setN.value = "135";
-    inputs.drift.value = "1.5"; inputs.driftN.value = "1.5";
+    inputs.drift.value = "0"; inputs.driftN.value = "0.0";
   }
 
   function recalc() {
@@ -239,35 +239,37 @@
     const SET_to = Number(inputs.set.value);
     const DRIFT = Number(inputs.drift.value);
 
-    // boat through water
+    // boat through water (TO)
     const V_bw = vecFromBearingTo(HDG, BSP);
 
-    // current
+    // current (TO)
     const V_cur = vecFromBearingTo(SET_to, DRIFT);
 
-    // ground speed
+    // ground velocity
     const V_bg = { x: V_bw.x + V_cur.x, y: V_bw.y + V_cur.y };
     const bg = bearingToFromVec(V_bg);
     const COG = bg.bearing;
     const SOG = bg.speed;
 
-    // ground wind (true wind over ground, earth frame)
+    // ground wind: given as FROM, stored as TO vector
     const V_gw = windVecFromDirFrom(GWD_from, GWS);
 
-    // apparent wind at the boat (air relative boat over ground)
+    // apparent wind at the boat (TO)
     const V_aw = { x: V_gw.x - V_bg.x, y: V_gw.y - V_bg.y };
     const V_aw_boat = vecNEToBoat(V_aw, HDG);
-    const AWS = Math.hypot(V_aw_boat.x, V_aw_boat.y);
-    const AWA = relAngleDegFromBoatVec(V_aw_boat);
-    const AWD_from = windDirFromVec(V_aw);
 
-    // true wind over water: subtract current from ground wind
-    // V_tw(water) = V_gw - V_cur
+    // IMPORTANT: AWA is wind FROM relative to bow
+    const V_aw_from_boat = { x: -V_aw_boat.x, y: -V_aw_boat.y };
+
+    const AWS = Math.hypot(V_aw_boat.x, V_aw_boat.y);
+    const AWA = relAngleDegFromBoatVec(V_aw_from_boat);
+
+    // true wind over water (TO)
     const V_tw = { x: V_gw.x - V_cur.x, y: V_gw.y - V_cur.y };
     const TWS = Math.hypot(V_tw.x, V_tw.y);
     const TWD_from = windDirFromVec(V_tw);
 
-    // TWA: wind FROM relative to bow
+    // TWA is wind FROM relative to bow
     const V_tw_boat = vecNEToBoat(V_tw, HDG);
     const V_tw_from_boat = { x: -V_tw_boat.x, y: -V_tw_boat.y };
     const TWA = relAngleDegFromBoatVec(V_tw_from_boat);
@@ -276,11 +278,10 @@
     out.cog.textContent = fmtDeg(COG);
     out.sog.textContent = `${fmt(SOG, 2)} kn`;
 
-    out.awa.textContent = `${fmtDegSigned(AWA)}`;
+    out.awa.textContent = `${fmtDegSigned(AWA)} (${AWA >= 0 ? "stbd" : "port"})`;
     out.aws.textContent = `${fmt(AWS, 2)} kn`;
-    out.awd.textContent = fmtDeg(AWD_from);
 
-    out.twa.textContent = `${fmtDegSigned(TWA)}`;
+    out.twa.textContent = `${fmtDegSigned(TWA)} (${TWA >= 0 ? "stbd" : "port"})`;
     out.twsOut.textContent = `${fmt(TWS, 2)} kn`;
     out.twdOut.textContent = fmtDeg(TWD_from);
 
