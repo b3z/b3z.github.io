@@ -92,9 +92,11 @@
   <div class="grid">
     <div class="card">
       <div class="small">
-        Inputs: <span class="mono">GWD, GWS, HDG, BSP, SET, DRIFT</span>.
+        Inputs: <span class="mono">GWD, GWS, HDG, SET, DRIFT</span>.
         <br/>
         Wind dirs are <span class="mono">FROM</span>, boat/current dirs are <span class="mono">TO</span>.
+        <br/>
+        <span class="mono">BSP</span> comes from a demo polar (edit it in JS).
       </div>
 
       <div class="toolbar">
@@ -114,17 +116,6 @@
         </div>
       </div>
       <input id="hdg" type="range" min="0" max="359" step="1" />
-
-      <!-- BSP -->
-      <div class="row">
-        <label for="bsp">BSP</label>
-        <div class="numCtl">
-          <button class="pmBtn" id="bspM" aria-label="BSP minus">−</button>
-          <input id="bspN" type="number" step="1" />
-          <button class="pmBtn" id="bspP" aria-label="BSP plus">+</button>
-        </div>
-      </div>
-      <input id="bsp" type="range" min="0" max="20" step="1" />
 
       <!-- GWD -->
       <div class="row">
@@ -178,7 +169,7 @@
 
       <div class="small" style="margin-top:10px;">
         AWA/TWA are signed in boat frame:
-        <br/>• <span class="mono">+</span> starboard, <span class="mono">-</span> port
+        <br/>• <span class="mono">+</span> stbd, <span class="mono">-</span> port
         <br/>• 0° = wind from straight ahead
       </div>
     </div>
@@ -194,6 +185,8 @@
           </tr>
         </thead>
         <tbody>
+          <tr><td>BSP</td><td class="mono base" id="bspB"></td><td class="mono" id="bspOut"></td><td class="mono delta" id="bspD"></td></tr>
+
           <tr><td>COG</td><td class="mono base" id="cogB"></td><td class="mono" id="cog"></td><td class="mono delta" id="cogD"></td></tr>
           <tr><td>SOG</td><td class="mono base" id="sogB"></td><td class="mono" id="sog"></td><td class="mono delta" id="sogD"></td></tr>
 
@@ -208,11 +201,6 @@
           <tr><td>GWD/GWS</td><td class="mono base" id="gwdGwsB"></td><td class="mono" id="gwdGwsEcho"></td><td class="mono delta" id="gwdGwsD"></td></tr>
         </tbody>
       </table>
-
-      <!-- <div class="small" style="margin-top:10px;"> -->
-      <!--   Canvas: boat + <span class="mono">V_bg</span> (thick), <span class="mono">V_bw</span> (dashed), <span class="mono">V_cur</span> (thin), <span class="mono">V_aw(FROM)</span>. -->
-      <!--   Inset: <span class="mono">V_gw(FROM)</span>. -->
-      <!-- </div> -->
 
       <div style="margin-top:10px;">
         <canvas id="cv" width="980" height="520"></canvas>
@@ -252,11 +240,13 @@
   }
 
   function windVecFromDirFrom(dirFromDeg, speed) {
+    // returns wind velocity vector pointing TO (downwind)
     return vecFromBearingTo(wrap360(dirFromDeg + 180), speed);
   }
 
-  function windDirFromVec(v) {
-    const { bearing } = bearingToFromVec(v);
+  function windDirFromVec(vTo) {
+    // given wind velocity vector TO, return direction FROM
+    const { bearing } = bearingToFromVec(vTo);
     return wrap360(bearing + 180);
   }
 
@@ -271,9 +261,63 @@
 
   const el = id => document.getElementById(id);
 
+  // ---------- demo polar (edit this for your boat) ----------
+  // angles in deg (0..180), speeds in kn
+  const POLAR_TWA = [0, 30, 45, 60, 90, 120, 150, 180];
+  const POLAR_TWS = [6, 10, 14, 18, 22];
+
+  // rows correspond to POLAR_TWS, columns to POLAR_TWA
+  // NOTE: this is just a smooth-ish placeholder. Replace with your real polar.
+  const POLAR_BSP = [
+    // TWS=6
+    [0, 5.6, 6.1, 6.3, 6.4, 6.0, 5.2, 0],
+    // TWS=10
+    [0, 6.6, 7.3, 7.8, 8.1, 7.9, 7.0, 0],
+    // TWS=14
+    [0, 7.4, 8.2, 8.8, 9.3, 9.6, 9.0, 0],
+    // TWS=18
+    [0, 7.9, 8.8, 9.5, 10.2, 10.8, 10.4, 0],
+    // TWS=22
+    [0, 8.1, 9.0, 9.7, 10.6, 11.4, 11.2, 0],
+  ];
+
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function findSpan(arr, x) {
+    if (x <= arr[0]) return { i0: 0, i1: 0, t: 0 };
+    if (x >= arr[arr.length - 1]) {
+      const i = arr.length - 1;
+      return { i0: i, i1: i, t: 0 };
+    }
+    for (let i = 0; i < arr.length - 1; i++) {
+      if (x >= arr[i] && x <= arr[i + 1]) {
+        const t = (x - arr[i]) / (arr[i + 1] - arr[i]);
+        return { i0: i, i1: i + 1, t };
+      }
+    }
+    return { i0: 0, i1: 0, t: 0 };
+  }
+
+  // bilinear interpolation over (TWS, TWA)
+  function polarBSP(tws, twaAbs) {
+    const twa = clamp(Math.abs(twaAbs), 0, 180);
+    const { i0: w0, i1: w1, t: tw } = findSpan(POLAR_TWS, tws);
+    const { i0: a0, i1: a1, t: ta } = findSpan(POLAR_TWA, twa);
+
+    const f00 = POLAR_BSP[w0][a0];
+    const f01 = POLAR_BSP[w0][a1];
+    const f10 = POLAR_BSP[w1][a0];
+    const f11 = POLAR_BSP[w1][a1];
+
+    const f0 = lerp(f00, f01, ta);
+    const f1 = lerp(f10, f11, ta);
+    return lerp(f0, f1, tw);
+  }
+
+  // ---------- UI refs ----------
   const inputs = {
     hdg: el("hdg"), hdgN: el("hdgN"), hdgM: el("hdgM"), hdgP: el("hdgP"),
-    bsp: el("bsp"), bspN: el("bspN"), bspM: el("bspM"), bspP: el("bspP"),
     gwd: el("gwd"), gwdN: el("gwdN"), gwdM: el("gwdM"), gwdP: el("gwdP"),
     gws: el("gws"), gwsN: el("gwsN"), gwsM: el("gwsM"), gwsP: el("gwsP"),
     set: el("set"), setN: el("setN"), setM: el("setM"), setP: el("setP"),
@@ -284,12 +328,14 @@
   };
 
   const out = {
+    bspOut: el("bspOut"),
     cog: el("cog"), sog: el("sog"),
     awa: el("awa"), aws: el("aws"),
     twa: el("twa"), twsOut: el("twsOut"), twdOut: el("twdOut"),
     setDrift: el("setDrift"),
     gwdGwsEcho: el("gwdGwsEcho"),
 
+    bspD: el("bspD"),
     cogD: el("cogD"), sogD: el("sogD"),
     awaD: el("awaD"), awsD: el("awsD"),
     twaD: el("twaD"), twsD: el("twsD"), twdD: el("twdD"),
@@ -297,6 +343,7 @@
     gwdGwsD: el("gwdGwsD"),
 
     // baseline column
+    bspB: el("bspB"),
     cogB: el("cogB"), sogB: el("sogB"),
     awaB: el("awaB"), awsB: el("awsB"),
     twaB: el("twaB"), twsB: el("twsB"), twdB: el("twdB"),
@@ -337,7 +384,6 @@
   }
 
   bindRangeAndNumber(inputs.hdg, inputs.hdgN);
-  bindRangeAndNumber(inputs.bsp, inputs.bspN);
   bindRangeAndNumber(inputs.gwd, inputs.gwdN);
   bindRangeAndNumber(inputs.gws, inputs.gwsN);
   bindRangeAndNumber(inputs.set, inputs.setN);
@@ -362,8 +408,6 @@
 
   inputs.hdgM.addEventListener("click", () => nudge("hdg", -1));
   inputs.hdgP.addEventListener("click", () => nudge("hdg", +1));
-  inputs.bspM.addEventListener("click", () => nudge("bsp", -1));
-  inputs.bspP.addEventListener("click", () => nudge("bsp", +1));
   inputs.gwdM.addEventListener("click", () => nudge("gwd", -1));
   inputs.gwdP.addEventListener("click", () => nudge("gwd", +1));
   inputs.gwsM.addEventListener("click", () => nudge("gws", -1));
@@ -375,10 +419,9 @@
 
   function setDefaults() {
     inputs.hdg.value = "318"; inputs.hdgN.value = "318";
-    inputs.bsp.value = "8"; inputs.bspN.value = "8";
-    inputs.gwd.value = "0"; inputs.gwdN.value = "0";
-    inputs.gws.value = "14"; inputs.gwsN.value = "14";
-    inputs.set.value = "0"; inputs.setN.value = "0";
+    inputs.gwd.value = "0";   inputs.gwdN.value = "0";
+    inputs.gws.value = "14";  inputs.gwsN.value = "14";
+    inputs.set.value = "0";   inputs.setN.value = "0";
     inputs.drift.value = "0"; inputs.driftN.value = "0";
   }
 
@@ -401,9 +444,9 @@
 
   function clearDeltasAndBaselineCols() {
     // baseline col
-    for (const k of ["cogB","sogB","awaB","awsB","twaB","twsB","twdB","setDriftB","gwdGwsB"]) setBaseCell(out[k], "—");
+    for (const k of ["bspB","cogB","sogB","awaB","awsB","twaB","twsB","twdB","setDriftB","gwdGwsB"]) setBaseCell(out[k], "—");
     // delta col
-    for (const k of ["cogD","sogD","awaD","awsD","twaD","twsD","twdD","setDriftD","gwdGwsD"]) {
+    for (const k of ["bspD","cogD","sogD","awaD","awsD","twaD","twsD","twdD","setDriftD","gwdGwsD"]) {
       out[k].textContent = "—";
       out[k].className = "mono delta zero";
     }
@@ -417,9 +460,9 @@
   }
 
   inputs.baseline.addEventListener("click", () => {
-    recalc(false); // refresh lastComputed
+    recalc(false);
     if (state.lastComputed) setBaselineSnapshot(state.lastComputed);
-    recalc(false); // redraw with baseline column + deltas
+    recalc(false);
   });
 
   inputs.reset.addEventListener("click", () => {
@@ -434,7 +477,6 @@
     readTheme();
 
     const HDG = Number(inputs.hdg.value);
-    const BSP = Number(inputs.bsp.value);
 
     const GWD_from = Number(inputs.gwd.value);
     const GWS = Number(inputs.gws.value);
@@ -442,11 +484,27 @@
     const SET_to = Number(inputs.set.value);
     const DRIFT = Number(inputs.drift.value);
 
-    // boat through water (TO)
-    const V_bw = vecFromBearingTo(HDG, BSP);
-
     // current (TO)
     const V_cur = vecFromBearingTo(SET_to, DRIFT);
+
+    // ground wind (TO)
+    const V_gw_to = windVecFromDirFrom(GWD_from, GWS);
+
+    // true wind over water (TO) (independent of BSP)
+    const V_tw_to = { x: V_gw_to.x - V_cur.x, y: V_gw_to.y - V_cur.y };
+    const TWS = Math.hypot(V_tw_to.x, V_tw_to.y);
+    const TWD_from = windDirFromVec(V_tw_to);
+
+    // TWA in boat frame (FROM)
+    const V_tw_boat = vecNEToBoat(V_tw_to, HDG);
+    const V_tw_from_boat = { x: -V_tw_boat.x, y: -V_tw_boat.y };
+    const TWA = relAngleDegFromBoatVec(V_tw_from_boat);
+
+    // BSP from polar
+    const BSP = polarBSP(TWS, TWA);
+
+    // boat through water (TO)
+    const V_bw = vecFromBearingTo(HDG, BSP);
 
     // ground velocity
     const V_bg = { x: V_bw.x + V_cur.x, y: V_bw.y + V_cur.y };
@@ -454,29 +512,17 @@
     const COG = bg.bearing;
     const SOG = bg.speed;
 
-    // ground wind: given as FROM, stored as TO vector
-    const V_gw_to = windVecFromDirFrom(GWD_from, GWS);
-    const V_gw_from = { x: -V_gw_to.x, y: -V_gw_to.y };
-
     // apparent wind at the boat (TO)
     const V_aw_to = { x: V_gw_to.x - V_bg.x, y: V_gw_to.y - V_bg.y };
-    const V_aw_from = { x: -V_aw_to.x, y: -V_aw_to.y };
     const V_aw_boat_to = vecNEToBoat(V_aw_to, HDG);
     const V_aw_from_boat = { x: -V_aw_boat_to.x, y: -V_aw_boat_to.y };
 
     const AWS = Math.hypot(V_aw_boat_to.x, V_aw_boat_to.y);
     const AWA = relAngleDegFromBoatVec(V_aw_from_boat);
 
-    // true wind over water (TO)
-    const V_tw_to = { x: V_gw_to.x - V_cur.x, y: V_gw_to.y - V_cur.y };
-    const TWS = Math.hypot(V_tw_to.x, V_tw_to.y);
-    const TWD_from = windDirFromVec(V_tw_to);
-
-    const V_tw_boat = vecNEToBoat(V_tw_to, HDG);
-    const V_tw_from_boat = { x: -V_tw_boat.x, y: -V_tw_boat.y };
-    const TWA = relAngleDegFromBoatVec(V_tw_from_boat);
-
     // outputs (value)
+    out.bspOut.textContent = `${fmt(BSP, 2)} kn`;
+
     out.cog.textContent = fmtDeg(COG);
     out.sog.textContent = `${fmt(SOG, 2)} kn`;
 
@@ -490,18 +536,19 @@
     out.setDrift.textContent = `${fmtDeg(SET_to)} / ${fmt(DRIFT, 2)} kn`;
     out.gwdGwsEcho.textContent = `${fmtDeg(GWD_from)} / ${fmt(GWS, 2)} kn`;
 
-    const snap = { COG, SOG, AWA, AWS, TWA, TWS, TWD_from, SET_to, DRIFT, GWD_from, GWS };
+    const snap = { BSP, COG, SOG, AWA, AWS, TWA, TWS, TWD_from, SET_to, DRIFT, GWD_from, GWS };
     state.lastComputed = snap;
 
     if (resetDelta) {
       clearDeltasAndBaselineCols();
     } else if (!state.baseline) {
-      // baseline not set => show — in baseline & delta cols
       clearDeltasAndBaselineCols();
     } else {
       const b = state.baseline;
 
       // baseline column
+      setBaseCell(out.bspB, `${fmt(b.BSP,2)} kn`);
+
       setBaseCell(out.cogB, `${fmtDeg(b.COG)}`);
       setBaseCell(out.sogB, `${fmt(b.SOG,2)} kn`);
       setBaseCell(out.awaB, `${fmtDegSigned(b.AWA)}`);
@@ -513,6 +560,8 @@
       setBaseCell(out.gwdGwsB, `${fmtDeg(b.GWD_from)} / ${fmt(b.GWS,2)} kn`);
 
       // deltas vs baseline
+      setDeltaCell(out.bspD, BSP - b.BSP, false, 2);
+
       setDeltaCell(out.cogD, angDiffDeg(COG, b.COG), true);
       setDeltaCell(out.sogD, SOG - b.SOG, false, 2);
 
@@ -549,8 +598,8 @@
       V_bw,
       V_cur,
       V_bg,
-      V_aw_from,
-      V_gw_from,
+      V_aw_to,   // TO (arrow points where wind goes)
+      V_gw_to,   // TO
       GWD_from,
       GWS
     });
@@ -600,9 +649,8 @@
     ctx.translate(origin.x, origin.y);
     ctx.rotate(deg2rad(hdgDeg));
     ctx.strokeStyle = state.theme.vec;
-    ctx.fillStyle = state.theme.vec;
 
-    // simple hull (triangle-ish)
+    // simple hull
     const L = 26, W = 14;
     ctx.globalAlpha = 0.6;
     ctx.lineWidth = 2;
@@ -614,57 +662,49 @@
     ctx.closePath();
     ctx.stroke();
 
-    // centerline / bow mark
-    ctx.globalAlpha = 0.6;
+    // centerline
     ctx.beginPath();
     ctx.moveTo(0, 10);
     ctx.lineTo(0, -L - 8);
     ctx.stroke();
 
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = state.theme.hdg;
-    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
-    ctx.fillText("", 10, -L - 6);
-
     ctx.restore();
   }
 
-  function drawInsetWind(box, V_gw_from, GWD_from, GWS) {
+  function drawInsetWind(box, V_gw_to, GWD_from, GWS) {
     ctx.save();
 
-    // box
     ctx.globalAlpha = 0.9;
     ctx.strokeStyle = state.theme.grid;
-    ctx.fillStyle = "transparent";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(box.x, box.y, box.w, box.h, 10);
     ctx.stroke();
 
-    // title
     ctx.globalAlpha = 1;
     ctx.fillStyle = state.theme.vec;
     ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
     ctx.fillText(`GWD/GWS ${wrap360(GWD_from).toFixed(0)}° / ${Number(GWS).toFixed(1)} kn`, box.x + 10, box.y + 18);
 
-    // tiny compass cross
     const cx = box.x + box.w * 0.5;
     const cy = box.y + box.h * 0.62;
+
     ctx.globalAlpha = 0.6;
     ctx.strokeStyle = state.theme.grid;
     ctx.beginPath(); ctx.moveTo(box.x + 10, cy); ctx.lineTo(box.x + box.w - 10, cy); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx, box.y + 30); ctx.lineTo(cx, box.y + box.h - 10); ctx.stroke();
 
-    // arrow scaled to box
-    const maxSpd = Math.max(1, Math.hypot(V_gw_from.x, V_gw_from.y));
+    const maxSpd = Math.max(1, Math.hypot(V_gw_to.x, V_gw_to.y));
     const scale = (Math.min(box.w, box.h) * 0.28) / maxSpd;
-    drawArrow({ x: cx, y: cy }, V_gw_from, scale, "GW", { width: 2, alpha: 1 });
+
+    // GW arrow points TO (downwind)
+    drawArrow({ x: cx, y: cy }, V_gw_to, scale, "GW", { width: 2, alpha: 1 });
 
     ctx.restore();
   }
 
   function drawCanvas(s) {
-    const { HDG, V_bw, V_cur, V_bg, V_aw_from, V_gw_from, GWD_from, GWS } = s;
+    const { HDG, V_bw, V_cur, V_bg, V_aw_to, V_gw_to, GWD_from, GWS } = s;
 
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const cssW = cv.clientWidth, cssH = cv.clientHeight;
@@ -674,10 +714,9 @@
 
     ctx.clearRect(0, 0, cssW, cssH);
 
-    // main origin (boat)
     const origin = { x: cssW * 0.42, y: cssH * 0.62 };
 
-    // light grid (less dominant)
+    // grid
     ctx.save();
     ctx.globalAlpha = 0.6;
     ctx.lineWidth = 1;
@@ -686,28 +725,27 @@
     ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, cssH); ctx.stroke();
     ctx.restore();
 
-    // scaling based on the few vectors we draw
     const maxSpd = Math.max(
       1,
       Math.hypot(V_bg.x, V_bg.y),
       Math.hypot(V_bw.x, V_bw.y),
       Math.hypot(V_cur.x, V_cur.y),
-      Math.hypot(V_aw_from.x, V_aw_from.y)
+      Math.hypot(V_aw_to.x, V_aw_to.y)
     );
     const scale = (Math.min(cssW, cssH) * 0.34) / maxSpd;
 
-    // vectors (monochrome, different line styles to reduce clutter)
-    drawArrow(origin, V_bg, scale, "COG", { width: 3, alpha: 1 });
-    drawArrow(origin, V_bw, scale, "BSP", { width: 2, alpha: 0.7, dash: [8, 6] });
-    drawArrow(origin, V_cur, scale, "cur", { width: 2, alpha: 0.55, dash: [2, 6] });
-    drawArrow(origin, V_aw_from, scale, "AW", { width: 1, alpha: 0.3 });
+    drawArrow(origin, V_bg,   scale, "COG", { width: 3, alpha: 1 });
+    drawArrow(origin, V_bw,   scale, "BSP", { width: 2, alpha: 0.7, dash: [8, 6] });
+    drawArrow(origin, V_cur,  scale, "cur", { width: 2, alpha: 0.55, dash: [2, 6] });
 
-    // boat
+    // AW arrow points TO (wind velocity)
+    const awOrigin = { x: origin.x, y: origin.y}; 
+    drawArrow(awOrigin, V_aw_to, scale, "AW", { width: 1, alpha: 0.3 });
+
     drawBoat(origin, HDG);
 
-    // inset top-right: ground wind
     const box = { x: cssW - 240, y: 16, w: 224, h: 150 };
-    drawInsetWind(box, V_gw_from, GWD_from, GWS);
+    drawInsetWind(box, V_gw_to, GWD_from, GWS);
   }
 
   // init
@@ -715,7 +753,6 @@
   readTheme();
   recalc(true);
 
-  // resize + theme changes
   window.addEventListener("resize", () => recalc(false));
   const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
   if (mq && mq.addEventListener) mq.addEventListener("change", () => recalc(false));
