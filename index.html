@@ -738,20 +738,20 @@ twa/tws;4;6;8;10;12;14;16;20;24
     const AWA = relAngleDegFromBoatVec(V_aw_from_boat);
 
     // outputs (value)
-    out.bspOut.textContent = `${fmt(BSP, 2)} kn`;
+    out.bspOut.textContent = `${fmt(BSP, 1)} kn`;
 
     out.cog.textContent = fmtDeg(COG);
-    out.sog.textContent = `${fmt(SOG, 2)} kn`;
+    out.sog.textContent = `${fmt(SOG, 1)} kn`;
 
     out.awa.textContent = `${fmtDegSigned(AWA)} (${AWA >= 0 ? "stbd" : "port"})`;
-    out.aws.textContent = `${fmt(AWS, 2)} kn`;
+    out.aws.textContent = `${fmt(AWS, 1)} kn`;
 
     out.twa.textContent = `${fmtDegSigned(TWA)} (${TWA >= 0 ? "stbd" : "port"})`;
-    out.twsOut.textContent = `${fmt(TWS, 2)} kn`;
+    out.twsOut.textContent = `${fmt(TWS, 1)} kn`;
     out.twdOut.textContent = fmtDeg(TWD_from);
 
-    out.setDrift.textContent = `${fmtDeg(SET_to)} / ${fmt(DRIFT, 2)} kn`;
-    out.gwdGwsEcho.textContent = `${fmtDeg(GWD_from)} / ${fmt(GWS, 2)} kn`;
+    out.setDrift.textContent = `${fmtDeg(SET_to)} / ${fmt(DRIFT, 1)} kn`;
+    out.gwdGwsEcho.textContent = `${fmtDeg(GWD_from)} / ${fmt(GWS, 1)} kn`;
 
     const snap = { BSP, COG, SOG, AWA, AWS, TWA, TWS, TWD_from, SET_to, DRIFT, GWD_from, GWS };
     state.lastComputed = snap;
@@ -764,29 +764,29 @@ twa/tws;4;6;8;10;12;14;16;20;24
       const b = state.baseline;
 
       // baseline column
-      setBaseCell(out.bspB, `${fmt(b.BSP,2)} kn`);
+      setBaseCell(out.bspB, `${fmt(b.BSP,1)} kn`);
 
       setBaseCell(out.cogB, `${fmtDeg(b.COG)}`);
-      setBaseCell(out.sogB, `${fmt(b.SOG,2)} kn`);
+      setBaseCell(out.sogB, `${fmt(b.SOG,1)} kn`);
       setBaseCell(out.awaB, `${fmtDegSigned(b.AWA)}`);
-      setBaseCell(out.awsB, `${fmt(b.AWS,2)} kn`);
+      setBaseCell(out.awsB, `${fmt(b.AWS,1)} kn`);
       setBaseCell(out.twaB, `${fmtDegSigned(b.TWA)}`);
-      setBaseCell(out.twsB, `${fmt(b.TWS,2)} kn`);
+      setBaseCell(out.twsB, `${fmt(b.TWS,1)} kn`);
       setBaseCell(out.twdB, `${fmtDeg(b.TWD_from)}`);
-      setBaseCell(out.setDriftB, `${fmtDeg(b.SET_to)} / ${fmt(b.DRIFT,2)} kn`);
-      setBaseCell(out.gwdGwsB, `${fmtDeg(b.GWD_from)} / ${fmt(b.GWS,2)} kn`);
+      setBaseCell(out.setDriftB, `${fmtDeg(b.SET_to)} / ${fmt(b.DRIFT,1)} kn`);
+      setBaseCell(out.gwdGwsB, `${fmtDeg(b.GWD_from)} / ${fmt(b.GWS,1)} kn`);
 
       // deltas vs baseline
-      setDeltaCell(out.bspD, BSP - b.BSP, false, 2);
+      setDeltaCell(out.bspD, BSP - b.BSP, false, 1);
 
       setDeltaCell(out.cogD, angDiffDeg(COG, b.COG), true);
-      setDeltaCell(out.sogD, SOG - b.SOG, false, 2);
+      setDeltaCell(out.sogD, SOG - b.SOG, false, 1);
 
       setDeltaCell(out.awaD, AWA - b.AWA, true);
-      setDeltaCell(out.awsD, AWS - b.AWS, false, 2);
+      setDeltaCell(out.awsD, AWS - b.AWS, false, 1);
 
       setDeltaCell(out.twaD, TWA - b.TWA, true);
-      setDeltaCell(out.twsD, TWS - b.TWS, false, 2);
+      setDeltaCell(out.twsD, TWS - b.TWS, false, 1);
       setDeltaCell(out.twdD, angDiffDeg(TWD_from, b.TWD_from), true);
 
       // SET/DRIFT combined
