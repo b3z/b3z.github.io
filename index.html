@@ -304,112 +304,110 @@
 
   const el = id => document.getElementById(id);
 
-  // ---------- POLAR (DEFAULT = your provided table) ----------
-  // Each row has its own TWA points (VMG TWAs differ by TWS).
-  // We add a synthetic (0°, 0 kn) to keep behavior sane near 0°.
-  const POLAR_ROWS = [
-    { tws: 6,  points: [
-      {twa: 0,    bsp: 0},
-      {twa: 44.2, bsp: 5.29},
-      {twa: 52,   bsp: 5.87},
-      {twa: 60,   bsp: 6.27},
-      {twa: 75,   bsp: 6.62},
-      {twa: 90,   bsp: 6.70},
-      {twa: 110,  bsp: 6.28},
-      {twa: 120,  bsp: 5.92},
-      {twa: 135,  bsp: 5.27},
-      {twa: 144,  bsp: 4.77},
-      {twa: 180,  bsp: 2.57},
-    ], vmgUp: {twa: 44.2, bsp: 5.29}, vmgDn: {twa: 144, bsp: 4.77} },
+    // ---------- POLAR (from your CSV) ----------
+  // Parsed from the twa/tws table you provided.
+  // For each TWS row we build:
+  //  - points: all non-zero (twa,bsp) plus (0,0)
+  //  - vmgUp: the single point with twa < 52 (your dedicated VMG-up rows)
+  //  - vmgDn: the single point with 135 < twa < 150 (your dedicated VMG-down rows)
+  const POLAR_CSV = `
+twa/tws;4;6;8;10;12;14;16;20;24
+0;0;0;0;0;0;0;0;0;0
+43.4;5.13;0;0;0;0;0;0;0;0
+43.4;0;7.05;0;0;0;0;0;0;0
+40.5;0;0;8.09;0;0;0;0;0;0
+38.9;0;0;0;8.56;0;0;0;0;0
+37.6;0;0;0;0;8.8;0;0;0;0
+36.8;0;0;0;0;0;8.97;0;0;0
+36.2;0;0;0;0;0;0;9.1;0;0
+36.1;0;0;0;0;0;0;0;9.32;0
+37.2;0;0;0;0;0;0;0;0;9.45
+52;5.91;7.84;9.06;9.58;9.97;10.29;10.55;10.96;11.1
+60;6.4;8.31;9.42;10.03;10.49;10.86;11.16;11.64;11.9
+75;6.75;8.65;9.74;10.63;11.24;11.74;12.17;12.88;13.42
+90;6.64;8.52;9.64;10.69;11.66;12.44;13.08;14.2;15.02
+110;5.81;7.9;9.44;10.49;11.28;12.04;13.32;15.45;17.04
+120;5.61;7.71;9.35;10.62;11.73;12.64;13.53;15.19;17.41
+135;4.8;6.96;8.82;10.05;11.37;12.88;14.38;16.56;18.71
+150;3.97;5.8;7.46;8.77;9.83;11.04;12.47;15.63;19.43
+140.5;4.46;0;0;0;0;0;0;0;0
+140.5;0;6.51;0;0;0;0;0;0;0
+141.3;0;0;8.28;0;0;0;0;0;0
+146.2;0;0;0;9.13;0;0;0;0;0
+147.3;0;0;0;0;10.12;0;0;0;0
+144.7;0;0;0;0;0;11.71;0;0;0
+144.1;0;0;0;0;0;0;13.33;0;0
+145.2;0;0;0;0;0;0;0;16.48;0
+148;0;0;0;0;0;0;0;0;19.83
+`.trim();
 
-    { tws: 8,  points: [
-      {twa: 0,   bsp: 0},
-      {twa: 42,  bsp: 5.99},
-      {twa: 52,  bsp: 6.65},
-      {twa: 60,  bsp: 6.91},
-      {twa: 75,  bsp: 7.19},
-      {twa: 90,  bsp: 7.27},
-      {twa: 110, bsp: 7.03},
-      {twa: 120, bsp: 6.94},
-      {twa: 135, bsp: 6.52},
-      {twa: 148, bsp: 5.70},
-      {twa: 180, bsp: 3.67},
-    ], vmgUp: {twa: 42, bsp: 5.99}, vmgDn: {twa: 148, bsp: 5.70} },
+  function parsePolarCSV(csv) {
+    const lines = csv.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const head = lines[0].split(";").map(s => s.trim());
+    const twsList = head.slice(1).map(Number);
 
-    { tws: 10, points: [
-      {twa: 0,    bsp: 0},
-      {twa: 39,   bsp: 6.27},
-      {twa: 52,   bsp: 6.92},
-      {twa: 60,   bsp: 7.14},
-      {twa: 75,   bsp: 7.52},
-      {twa: 90,   bsp: 7.77},
-      {twa: 110,  bsp: 7.64},
-      {twa: 120,  bsp: 7.56},
-      {twa: 135,  bsp: 7.20},
-      {twa: 149.2,bsp: 6.59},
-      {twa: 180,  bsp: 4.35},
-    ], vmgUp: {twa: 39, bsp: 6.27}, vmgDn: {twa: 149.2, bsp: 6.59} },
+    const rows = twsList.map(tws => ({
+      tws,
+      points: [{ twa: 0, bsp: 0 }],
+      vmgUp: null,
+      vmgDn: null,
+    }));
 
-    { tws: 12, points: [
-      {twa: 0,   bsp: 0},
-      {twa: 37.9,bsp: 6.37},
-      {twa: 52,  bsp: 7.08},
-      {twa: 60,  bsp: 7.31},
-      {twa: 75,  bsp: 7.75},
-      {twa: 90,  bsp: 8.16},
-      {twa: 110, bsp: 8.14},
-      {twa: 120, bsp: 8.27},
-      {twa: 135, bsp: 7.81},
-      {twa: 151, bsp: 7.07},
-      {twa: 180, bsp: 4.83},
-    ], vmgUp: {twa: 37.9, bsp: 6.37}, vmgDn: {twa: 151, bsp: 7.07} },
+    for (let li = 1; li < lines.length; li++) {
+      const parts = lines[li].split(";").map(s => s.trim());
+      if (parts.length < 2) continue;
 
-    { tws: 14, points: [
-      {twa: 0,   bsp: 0},
-      {twa: 38.2,bsp: 6.48},
-      {twa: 52,  bsp: 7.15},
-      {twa: 60,  bsp: 7.41},
-      {twa: 75,  bsp: 7.92},
-      {twa: 90,  bsp: 8.43},
-      {twa: 110, bsp: 8.58},
-      {twa: 120, bsp: 8.91},
-      {twa: 135, bsp: 8.52},
-      {twa: 175, bsp: 6.62},
-      {twa: 180, bsp: 6.29},
-    ], vmgUp: {twa: 38.2, bsp: 6.48}, vmgDn: {twa: 175, bsp: 6.62} },
+      const twa = Number(parts[0]);
+      if (!Number.isFinite(twa)) continue;
 
-    { tws: 16, points: [
-      {twa: 0,   bsp: 0},
-      {twa: 37.9,bsp: 6.53},
-      {twa: 52,  bsp: 7.19},
-      {twa: 60,  bsp: 7.46},
-      {twa: 75,  bsp: 8.06},
-      {twa: 90,  bsp: 8.65},
-      {twa: 110, bsp: 9.17},
-      {twa: 120, bsp: 9.36},
-      {twa: 135, bsp: 9.39},
-      {twa: 175, bsp: 7.08},
-      {twa: 180, bsp: 6.73},
-    ], vmgUp: {twa: 37.9, bsp: 6.53}, vmgDn: {twa: 175, bsp: 7.08} },
+      for (let ci = 1; ci < parts.length && ci <= twsList.length; ci++) {
+        const v = Number(parts[ci]);
+        if (!Number.isFinite(v) || v <= 0) continue;
 
-    { tws: 20, points: [
-      {twa: 0,   bsp: 0},
-      {twa: 38.6,bsp: 6.59},
-      {twa: 52,  bsp: 7.31},
-      {twa: 60,  bsp: 7.65},
-      {twa: 75,  bsp: 8.17},
-      {twa: 90,  bsp: 8.96},
-      {twa: 110, bsp: 10.08},
-      {twa: 120, bsp: 10.54},
-      {twa: 135, bsp: 11.59},
-      {twa: 141, bsp: 10.91},
-      {twa: 180, bsp: 5.65},
-    ], vmgUp: {twa: 38.6, bsp: 6.59}, vmgDn: {twa: 141, bsp: 10.91} },
-  ].map(r => ({
-    ...r,
-    points: r.points.slice().sort((a,b) => a.twa - b.twa)
-  }));
+        const r = rows[ci - 1];
 
+        // add to polar points
+        r.points.push({ twa, bsp: v });
+
+        // pick single vmgUp candidate: your dedicated rows are < 52
+        if (twa < 52) {
+          r.vmgUp = { twa, bsp: v };
+        }
+
+        // pick single vmgDn candidate: your dedicated rows are 135 < twa < 150
+        if (twa > 135 && twa < 150) {
+          r.vmgDn = { twa, bsp: v };
+        }
+      }
+    }
+
+    // finalize: sort points and ensure vmgUp/vmgDn exist (fallback to best guess if not)
+    for (const r of rows) {
+      // de-dup identical TWAs if any (keep last)
+      const byTwa = new Map();
+      for (const p of r.points) byTwa.set(p.twa, p);
+      // ensure closure at both ends
+      byTwa.set(0,   { twa: 0,   bsp: 0 });
+      byTwa.set(180, { twa: 180, bsp: 0 });
+
+      r.points = Array.from(byTwa.values()).sort((a, b) => a.twa - b.twa);
+
+      if (!r.vmgUp) {
+        // fallback: smallest TWA with non-zero speed
+        const cand = r.points.find(p => p.twa > 0);
+        r.vmgUp = cand ? { twa: cand.twa, bsp: cand.bsp } : { twa: 45, bsp: 0 };
+      }
+      if (!r.vmgDn) {
+        // fallback: largest TWA < 180
+        const cand = [...r.points].reverse().find(p => p.twa < 180);
+        r.vmgDn = cand ? { twa: cand.twa, bsp: cand.bsp } : { twa: 150, bsp: 0 };
+      }
+    }
+
+    return rows;
+  }
+
+  const POLAR_ROWS = parsePolarCSV(POLAR_CSV);
   const POLAR_TWS = POLAR_ROWS.map(r => r.tws);
 
   function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
