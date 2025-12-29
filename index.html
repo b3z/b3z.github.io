@@ -89,7 +89,7 @@
     .delta.zero, .base.zero { opacity: .55; }
 
     .split2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
-    .miniCard { border: 0px solid var(--border2); border-radius: 12px; padding: 10px; margin-top:10px; ; }
+    .miniCard { border: 0px solid var(--border2); border-radius: 12px; padding: 10px; margin-top:10px; }
 
     /* mode + tack controls */
     .modeRow { display:flex; align-items:center; gap:12px; margin: 10px 0 12px 0; }
@@ -213,7 +213,6 @@
           </tr>
         </thead>
         <tbody>
-
           <tr><td>COG</td><td class="mono base" id="cogB"></td><td class="mono" id="cog"></td><td class="mono delta" id="cogD"></td></tr>
           <tr><td>SOG</td><td class="mono base" id="sogB"></td><td class="mono" id="sog"></td><td class="mono delta" id="sogD"></td></tr>
 
@@ -231,23 +230,22 @@
         </tbody>
       </table>
 
-
       <div class="split2">
-      <div>
-        <canvas id="polarCv" width="980" height="360"></canvas>
-        <div class="miniCard small">
-          Polar view:
-          <br/>• thin curves = discrete <span class="mono">TWS</span> rows
-          <br/>• thick curve = interpolated at current <span class="mono">TWS</span>
-          <br/>• dot = current <span class="mono">(abs(TWA), BSP)</span>
-          <br>
-          VMG markers:
-          <br/>• <span class="mono">▲</span> upwind VMG point (<span class="mono">twaUp/bspUp</span>)
-          <br/>• <span class="mono">▼</span> downwind VMG point (<span class="mono">twaDn/bspDn</span>)
-          <br>
-          Questions or errors, text me. Cheers, Luca.
+        <div>
+          <canvas id="polarCv" width="980" height="360"></canvas>
+          <div class="miniCard small">
+            Polar view:
+            <br/>• thin curves = discrete <span class="mono">TWS</span> rows
+            <br/>• thick curve = interpolated at current <span class="mono">TWS</span>
+            <br/>• dot = current <span class="mono">(abs(TWA), BSP)</span>
+            <br>
+            VMG markers:
+            <br/>• <span class="mono">▲</span> upwind VMG point (<span class="mono">twaUp/bspUp</span>)
+            <br/>• <span class="mono">▼</span> downwind VMG point (<span class="mono">twaDn/bspDn</span>)
+            <br>
+            Questions or errors, text me. Cheers, Luca.
+          </div>
         </div>
-      </div>
         <canvas id="cv" width="980" height="520"></canvas>
       </div>
     </div>
@@ -255,6 +253,22 @@
 
 <script>
 (() => {
+  // ---------- formatting constants (change these) ----------
+  const DEC = {
+    // speeds in kn (BSP/SOG/AWS/TWS/DRIFT/GWS)
+    SPEED: 1,
+    // angle values (AWA/TWA) shown in the table
+    ANGLE_SIGNED: 1,
+    // angle values shown as headings (COG/TWD/GWD/SET)
+    ANGLE_WRAP: 0,
+    // deltas
+    DELTA_SPEED: 1,
+    DELTA_ANGLE: 1,
+    // polar overlay labels / header
+    POLAR_BSP: 2,
+    POLAR_TWA: 1,
+  };
+
   // ---------- helpers ----------
   const deg2rad = d => d * Math.PI / 180;
   const rad2deg = r => r * 180 / Math.PI;
@@ -300,18 +314,13 @@
     return ((ang + 180) % 360) - 180;
   }
 
-  const fmt = (x, digits=1) => Number.isFinite(x) ? x.toFixed(digits) : "—";
-  const fmtDeg = (d) => Number.isFinite(d) ? `${wrap360(d).toFixed(0)}°` : "—";
-  const fmtDegSigned = (d) => Number.isFinite(d) ? `${d.toFixed(0)}°` : "—";
+  const fmt = (x, digits=DEC.SPEED) => Number.isFinite(x) ? x.toFixed(digits) : "—";
+  const fmtDeg = (d, dec=DEC.ANGLE_WRAP) => Number.isFinite(d) ? `${wrap360(d).toFixed(dec)}°` : "—";
+  const fmtDegSigned = (d, dec=DEC.ANGLE_SIGNED) => Number.isFinite(d) ? `${d.toFixed(dec)}°` : "—";
 
   const el = id => document.getElementById(id);
 
-    // ---------- POLAR (from your CSV) ----------
-  // Parsed from the twa/tws table you provided.
-  // For each TWS row we build:
-  //  - points: all non-zero (twa,bsp) plus (0,0)
-  //  - vmgUp: the single point with twa < 52 (your dedicated VMG-up rows)
-  //  - vmgDn: the single point with 135 < twa < 150 (your dedicated VMG-down rows)
+  // ---------- POLAR (from your CSV) ----------
   const POLAR_CSV = `
 twa/tws;4;6;8;10;12;14;16;20;24
 0;0;0;0;0;0;0;0;0;0
@@ -368,39 +377,26 @@ twa/tws;4;6;8;10;12;14;16;20;24
 
         const r = rows[ci - 1];
 
-        // add to polar points
         r.points.push({ twa, bsp: v });
 
-        // pick single vmgUp candidate: your dedicated rows are < 52
-        if (twa < 52) {
-          r.vmgUp = { twa, bsp: v };
-        }
-
-        // pick single vmgDn candidate: your dedicated rows are 135 < twa < 150
-        if (twa > 135 && twa < 150) {
-          r.vmgDn = { twa, bsp: v };
-        }
+        if (twa < 52) r.vmgUp = { twa, bsp: v };
+        if (twa > 135 && twa < 150) r.vmgDn = { twa, bsp: v };
       }
     }
 
-    // finalize: sort points and ensure vmgUp/vmgDn exist (fallback to best guess if not)
     for (const r of rows) {
-      // de-dup identical TWAs if any (keep last)
       const byTwa = new Map();
       for (const p of r.points) byTwa.set(p.twa, p);
-      // ensure closure at both ends
       byTwa.set(0,   { twa: 0,   bsp: 0 });
       byTwa.set(180, { twa: 180, bsp: 0 });
 
       r.points = Array.from(byTwa.values()).sort((a, b) => a.twa - b.twa);
 
       if (!r.vmgUp) {
-        // fallback: smallest TWA with non-zero speed
         const cand = r.points.find(p => p.twa > 0);
         r.vmgUp = cand ? { twa: cand.twa, bsp: cand.bsp } : { twa: 45, bsp: 0 };
       }
       if (!r.vmgDn) {
-        // fallback: largest TWA < 180
         const cand = [...r.points].reverse().find(p => p.twa < 180);
         r.vmgDn = cand ? { twa: cand.twa, bsp: cand.bsp } : { twa: 150, bsp: 0 };
       }
@@ -447,7 +443,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     return pts[pts.length - 1].bsp;
   }
 
-  // interpolate across TWS by evaluating each bracketing row at requested TWA
   function polarBSP(tws, twaAbs) {
     const { i0, i1, t } = findSpan(POLAR_TWS, tws);
     const r0 = POLAR_ROWS[i0], r1 = POLAR_ROWS[i1];
@@ -478,7 +473,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     baselineInfo: el("baselineInfo"),
     reset: el("reset"),
 
-    // mode/tack
     modeFree: el("modeFree"),
     modeVmgUp: el("modeVmgUp"),
     modeVmgDn: el("modeVmgDn"),
@@ -503,7 +497,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     setDriftD: el("setDriftD"),
     gwdGwsD: el("gwdGwsD"),
 
-    // baseline column
     bspB: el("bspB"),
     cogB: el("cogB"), sogB: el("sogB"),
     awaB: el("awaB"), awsB: el("awsB"),
@@ -516,8 +509,8 @@ twa/tws;4;6;8;10;12;14;16;20;24
     baseline: null,
     lastComputed: null,
     theme: null,
-    mode: "free",   // "free" | "vmgUp" | "vmgDn"
-    tack: +1        // +1 stbd, -1 port (only used in VMG modes)
+    mode: "free",
+    tack: +1
   };
 
   function readTheme() {
@@ -588,7 +581,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     inputs.set.value = "0";   inputs.setN.value = "0";
     inputs.drift.value = "0"; inputs.driftN.value = "0";
 
-    // default mode/tack
     inputs.modeFree.checked = true;
     inputs.modeVmgUp.checked = false;
     inputs.modeVmgDn.checked = false;
@@ -601,13 +593,17 @@ twa/tws;4;6;8;10;12;14;16;20;24
     updateModeUI();
   }
 
-  function setDeltaCell(cell, delta, isAngle=false, digits=2) {
+  function angleEps(dec) { return 0.5 * Math.pow(10, -dec); }
+
+  function setDeltaCell(cell, delta, isAngle=false, digits=DEC.DELTA_SPEED, angleDec=DEC.DELTA_ANGLE) {
     cell.classList.remove("pos", "neg", "zero");
     if (!Number.isFinite(delta)) { cell.textContent = "—"; cell.classList.add("zero"); return; }
-    const eps = isAngle ? 0.5 : 1e-9;
+
+    const eps = isAngle ? angleEps(angleDec) : 1e-9;
     if (Math.abs(delta) < eps) { cell.textContent = "0"; cell.classList.add("zero"); return; }
+
     const sign = delta > 0 ? "+" : "";
-    const txt = isAngle ? `${sign}${delta.toFixed(0)}°` : `${sign}${delta.toFixed(digits)}`;
+    const txt = isAngle ? `${sign}${delta.toFixed(angleDec)}°` : `${sign}${delta.toFixed(digits)}`;
     cell.textContent = txt;
     cell.classList.add(delta > 0 ? "pos" : "neg");
   }
@@ -619,9 +615,7 @@ twa/tws;4;6;8;10;12;14;16;20;24
   }
 
   function clearDeltasAndBaselineCols() {
-    // baseline col
     for (const k of ["bspB","cogB","sogB","awaB","awsB","twaB","twsB","twdB","setDriftB","gwdGwsB"]) setBaseCell(out[k], "—");
-    // delta col
     for (const k of ["bspD","cogD","sogD","awaD","awsD","twaD","twsD","twdD","setDriftD","gwdGwsD"]) {
       out[k].textContent = "—";
       out[k].className = "mono delta zero";
@@ -686,50 +680,37 @@ twa/tws;4;6;8;10;12;14;16;20;24
     const SET_to = Number(inputs.set.value);
     const DRIFT = Number(inputs.drift.value);
 
-    // current (TO)
     const V_cur = vecFromBearingTo(SET_to, DRIFT);
-
-    // ground wind (TO)
     const V_gw_to = windVecFromDirFrom(GWD_from, GWS);
 
-    // true wind over water (TO) (independent of BSP)
     const V_tw_to = { x: V_gw_to.x - V_cur.x, y: V_gw_to.y - V_cur.y };
     const TWS = Math.hypot(V_tw_to.x, V_tw_to.y);
     const TWD_from = windDirFromVec(V_tw_to);
 
-    // MODE LOGIC 
-    // VMG modes: take target TWA from polar (based on current TWS), choose tack, then derive HDG.
     if (state.mode === "vmgUp" || state.mode === "vmgDn") {
       const which = (state.mode === "vmgUp") ? "up" : "dn";
       const targetAbs = polarVMGPoint(TWS, which).twa;
-      const targetTWA = state.tack * targetAbs; // +stbd, -port
+      const targetTWA = state.tack * targetAbs;
 
-      // TWA = angDiffDeg(TWD_from, HDG)  =>  HDG = TWD_from - TWA
       HDG = wrap360(TWD_from - targetTWA);
 
-      // keep UI in sync (even if hidden)
       inputs.hdg.value = String(Math.round(HDG));
       inputs.hdgN.value = String(Math.round(HDG));
     }
 
-    // TWA in boat frame (FROM)
     const V_tw_boat = vecNEToBoat(V_tw_to, HDG);
     const V_tw_from_boat = { x: -V_tw_boat.x, y: -V_tw_boat.y };
     const TWA = relAngleDegFromBoatVec(V_tw_from_boat);
 
-    // BSP from polar
     const BSP = polarBSP(TWS, TWA);
 
-    // boat through water (TO)
     const V_bw = vecFromBearingTo(HDG, BSP);
 
-    // ground velocity
     const V_bg = { x: V_bw.x + V_cur.x, y: V_bw.y + V_cur.y };
     const bg = bearingToFromVec(V_bg);
     const COG = bg.bearing;
     const SOG = bg.speed;
 
-    // apparent wind at the boat (TO)
     const V_aw_to = { x: V_gw_to.x - V_bg.x, y: V_gw_to.y - V_bg.y };
     const V_aw_boat_to = vecNEToBoat(V_aw_to, HDG);
     const V_aw_from_boat = { x: -V_aw_boat_to.x, y: -V_aw_boat_to.y };
@@ -738,63 +719,68 @@ twa/tws;4;6;8;10;12;14;16;20;24
     const AWA = relAngleDegFromBoatVec(V_aw_from_boat);
 
     // outputs (value)
-    out.bspOut.textContent = `${fmt(BSP, 1)} kn`;
+    out.bspOut.textContent = `${fmt(BSP, DEC.SPEED)} kn`;
 
-    out.cog.textContent = fmtDeg(COG);
-    out.sog.textContent = `${fmt(SOG, 1)} kn`;
+    out.cog.textContent = fmtDeg(COG, DEC.ANGLE_WRAP);
+    out.sog.textContent = `${fmt(SOG, DEC.SPEED)} kn`;
 
-    out.awa.textContent = `${fmtDegSigned(AWA)} (${AWA >= 0 ? "stbd" : "port"})`;
-    out.aws.textContent = `${fmt(AWS, 1)} kn`;
+    // AWA/TWA with 1 decimal (via DEC.ANGLE_SIGNED)
+    out.awa.textContent = `${fmtDegSigned(AWA, DEC.ANGLE_SIGNED)} (${AWA >= 0 ? "stbd" : "port"})`;
+    out.aws.textContent = `${fmt(AWS, DEC.SPEED)} kn`;
 
-    out.twa.textContent = `${fmtDegSigned(TWA)} (${TWA >= 0 ? "stbd" : "port"})`;
-    out.twsOut.textContent = `${fmt(TWS, 1)} kn`;
-    out.twdOut.textContent = fmtDeg(TWD_from);
+    out.twa.textContent = `${fmtDegSigned(TWA, DEC.ANGLE_SIGNED)} (${TWA >= 0 ? "stbd" : "port"})`;
+    out.twsOut.textContent = `${fmt(TWS, DEC.SPEED)} kn`;
+    out.twdOut.textContent = fmtDeg(TWD_from, DEC.ANGLE_WRAP);
 
-    out.setDrift.textContent = `${fmtDeg(SET_to)} / ${fmt(DRIFT, 1)} kn`;
-    out.gwdGwsEcho.textContent = `${fmtDeg(GWD_from)} / ${fmt(GWS, 1)} kn`;
+    out.setDrift.textContent = `${fmtDeg(SET_to, DEC.ANGLE_WRAP)} / ${fmt(DRIFT, DEC.SPEED)} kn`;
+    out.gwdGwsEcho.textContent = `${fmtDeg(GWD_from, DEC.ANGLE_WRAP)} / ${fmt(GWS, DEC.SPEED)} kn`;
 
     const snap = { BSP, COG, SOG, AWA, AWS, TWA, TWS, TWD_from, SET_to, DRIFT, GWD_from, GWS };
     state.lastComputed = snap;
 
-    if (resetDelta) {
-      clearDeltasAndBaselineCols();
-    } else if (!state.baseline) {
+    if (resetDelta || !state.baseline) {
       clearDeltasAndBaselineCols();
     } else {
       const b = state.baseline;
 
       // baseline column
-      setBaseCell(out.bspB, `${fmt(b.BSP,1)} kn`);
-
-      setBaseCell(out.cogB, `${fmtDeg(b.COG)}`);
-      setBaseCell(out.sogB, `${fmt(b.SOG,1)} kn`);
-      setBaseCell(out.awaB, `${fmtDegSigned(b.AWA)}`);
-      setBaseCell(out.awsB, `${fmt(b.AWS,1)} kn`);
-      setBaseCell(out.twaB, `${fmtDegSigned(b.TWA)}`);
-      setBaseCell(out.twsB, `${fmt(b.TWS,1)} kn`);
-      setBaseCell(out.twdB, `${fmtDeg(b.TWD_from)}`);
-      setBaseCell(out.setDriftB, `${fmtDeg(b.SET_to)} / ${fmt(b.DRIFT,1)} kn`);
-      setBaseCell(out.gwdGwsB, `${fmtDeg(b.GWD_from)} / ${fmt(b.GWS,1)} kn`);
+      setBaseCell(out.bspB, `${fmt(b.BSP, DEC.SPEED)} kn`);
+      setBaseCell(out.cogB, `${fmtDeg(b.COG, DEC.ANGLE_WRAP)}`);
+      setBaseCell(out.sogB, `${fmt(b.SOG, DEC.SPEED)} kn`);
+      setBaseCell(out.awaB, `${fmtDegSigned(b.AWA, DEC.ANGLE_SIGNED)}`);
+      setBaseCell(out.awsB, `${fmt(b.AWS, DEC.SPEED)} kn`);
+      setBaseCell(out.twaB, `${fmtDegSigned(b.TWA, DEC.ANGLE_SIGNED)}`);
+      setBaseCell(out.twsB, `${fmt(b.TWS, DEC.SPEED)} kn`);
+      setBaseCell(out.twdB, `${fmtDeg(b.TWD_from, DEC.ANGLE_WRAP)}`);
+      setBaseCell(out.setDriftB, `${fmtDeg(b.SET_to, DEC.ANGLE_WRAP)} / ${fmt(b.DRIFT, DEC.SPEED)} kn`);
+      setBaseCell(out.gwdGwsB, `${fmtDeg(b.GWD_from, DEC.ANGLE_WRAP)} / ${fmt(b.GWS, DEC.SPEED)} kn`);
 
       // deltas vs baseline
-      setDeltaCell(out.bspD, BSP - b.BSP, false, 1);
+      setDeltaCell(out.bspD, BSP - b.BSP, false, DEC.DELTA_SPEED, DEC.DELTA_ANGLE);
 
-      setDeltaCell(out.cogD, angDiffDeg(COG, b.COG), true);
-      setDeltaCell(out.sogD, SOG - b.SOG, false, 1);
+      setDeltaCell(out.cogD, angDiffDeg(COG, b.COG), true,  DEC.DELTA_SPEED, DEC.DELTA_ANGLE);
+      setDeltaCell(out.sogD, SOG - b.SOG, false, DEC.DELTA_SPEED, DEC.DELTA_ANGLE);
 
-      setDeltaCell(out.awaD, AWA - b.AWA, true);
-      setDeltaCell(out.awsD, AWS - b.AWS, false, 1);
+      setDeltaCell(out.awaD, AWA - b.AWA, true,  DEC.DELTA_SPEED, DEC.DELTA_ANGLE);
+      setDeltaCell(out.awsD, AWS - b.AWS, false, DEC.DELTA_SPEED, DEC.DELTA_ANGLE);
 
-      setDeltaCell(out.twaD, TWA - b.TWA, true);
-      setDeltaCell(out.twsD, TWS - b.TWS, false, 1);
-      setDeltaCell(out.twdD, angDiffDeg(TWD_from, b.TWD_from), true);
+      setDeltaCell(out.twaD, TWA - b.TWA, true,  DEC.DELTA_SPEED, DEC.DELTA_ANGLE);
+      setDeltaCell(out.twsD, TWS - b.TWS, false, DEC.DELTA_SPEED, DEC.DELTA_ANGLE);
+      setDeltaCell(out.twdD, angDiffDeg(TWD_from, b.TWD_from), true, DEC.DELTA_SPEED, DEC.DELTA_ANGLE);
 
       // SET/DRIFT combined
       const dSet = angDiffDeg(SET_to, b.SET_to);
       const dDrift = DRIFT - b.DRIFT;
       out.setDriftD.classList.remove("pos","neg","zero");
-      const s1 = (Math.abs(dSet) < 0.5) ? "0°" : `${dSet > 0 ? "+" : ""}${dSet.toFixed(0)}°`;
-      const s2 = (Math.abs(dDrift) < 1e-9) ? "0" : `${dDrift > 0 ? "+" : ""}${dDrift.toFixed(2)}`;
+
+      const s1 = (Math.abs(dSet) < angleEps(DEC.DELTA_ANGLE))
+        ? "0°"
+        : `${dSet > 0 ? "+" : ""}${dSet.toFixed(DEC.DELTA_ANGLE)}°`;
+
+      const s2 = (Math.abs(dDrift) < 1e-9)
+        ? "0"
+        : `${dDrift > 0 ? "+" : ""}${dDrift.toFixed(DEC.DELTA_SPEED)}`;
+
       out.setDriftD.textContent = `${s1} / ${s2}`;
       if (Math.abs(dDrift) < 1e-9) out.setDriftD.classList.add("zero");
       else out.setDriftD.classList.add(dDrift > 0 ? "pos" : "neg");
@@ -803,8 +789,15 @@ twa/tws;4;6;8;10;12;14;16;20;24
       const dGwd = angDiffDeg(GWD_from, b.GWD_from);
       const dGws = GWS - b.GWS;
       out.gwdGwsD.classList.remove("pos","neg","zero");
-      const g1 = (Math.abs(dGwd) < 0.5) ? "0°" : `${dGwd > 0 ? "+" : ""}${dGwd.toFixed(0)}°`;
-      const g2 = (Math.abs(dGws) < 1e-9) ? "0" : `${dGws > 0 ? "+" : ""}${dGws.toFixed(2)}`;
+
+      const g1 = (Math.abs(dGwd) < angleEps(DEC.DELTA_ANGLE))
+        ? "0°"
+        : `${dGwd > 0 ? "+" : ""}${dGwd.toFixed(DEC.DELTA_ANGLE)}°`;
+
+      const g2 = (Math.abs(dGws) < 1e-9)
+        ? "0"
+        : `${dGws > 0 ? "+" : ""}${dGws.toFixed(DEC.DELTA_SPEED)}`;
+
       out.gwdGwsD.textContent = `${g1} / ${g2}`;
       if (Math.abs(dGws) < 1e-9) out.gwdGwsD.classList.add("zero");
       else out.gwdGwsD.classList.add(dGws > 0 ? "pos" : "neg");
@@ -815,17 +808,13 @@ twa/tws;4;6;8;10;12;14;16;20;24
       V_bw,
       V_cur,
       V_bg,
-      V_aw_to,   // TO (arrow points where wind goes)
-      V_gw_to,   // TO
+      V_aw_to,
+      V_gw_to,
       GWD_from,
       GWS
     });
 
-    drawPolarCanvas({
-      TWS,
-      TWA,
-      BSP
-    });
+    drawPolarCanvas({ TWS, TWA, BSP });
   }
 
   // ---------- vector canvas ----------
@@ -873,7 +862,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     ctx.rotate(deg2rad(hdgDeg));
     ctx.strokeStyle = state.theme.vec;
 
-    // simple hull
     const L = 26, W = 14;
     ctx.globalAlpha = 0.6;
     ctx.lineWidth = 2;
@@ -885,7 +873,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     ctx.closePath();
     ctx.stroke();
 
-    // centerline
     ctx.beginPath();
     ctx.moveTo(0, 10);
     ctx.lineTo(0, -L - 8);
@@ -907,7 +894,10 @@ twa/tws;4;6;8;10;12;14;16;20;24
     ctx.globalAlpha = 1;
     ctx.fillStyle = state.theme.vec;
     ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
-    ctx.fillText(`GWD/GWS ${wrap360(GWD_from).toFixed(0)}° / ${Number(GWS).toFixed(1)} kn`, box.x + 10, box.y + 18);
+    ctx.fillText(
+      `GWD/GWS ${wrap360(GWD_from).toFixed(DEC.ANGLE_WRAP)}° / ${Number(GWS).toFixed(DEC.SPEED)} kn`,
+      box.x + 10, box.y + 18
+    );
 
     const cx = box.x + box.w * 0.5;
     const cy = box.y + box.h * 0.62;
@@ -920,7 +910,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     const maxSpd = Math.max(1, Math.hypot(V_gw_to.x, V_gw_to.y));
     const scale = (Math.min(box.w, box.h) * 0.28) / maxSpd;
 
-    // GW arrow points TO (downwind)
     drawArrow({ x: cx, y: cy }, V_gw_to, scale, "GW", { width: 2, alpha: 1 });
 
     ctx.restore();
@@ -939,7 +928,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
 
     const origin = { x: cssW * 0.42, y: cssH * 0.62 };
 
-    // grid
     ctx.save();
     ctx.globalAlpha = 0.6;
     ctx.lineWidth = 1;
@@ -961,7 +949,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     drawArrow(origin, V_bw,   scale, "BSP", { width: 2, alpha: 0.7, dash: [8, 6] });
     drawArrow(origin, V_cur,  scale, "cur", { width: 2, alpha: 0.55, dash: [2, 6] });
 
-    // AW arrow points TO (wind velocity)
     const awOrigin = { x: origin.x, y: origin.y };
     drawArrow(awOrigin, V_aw_to, scale, "AW", { width: 1, alpha: 0.3 });
 
@@ -990,7 +977,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     const plotW = cssW - pad.l - pad.r;
     const plotH = cssH - pad.t - pad.b;
 
-    // y max from polar (a bit padded)
     let yMax = 1;
     for (const r of POLAR_ROWS) for (const pt of r.points) yMax = Math.max(yMax, pt.bsp);
     yMax = Math.ceil((yMax + 0.6) * 2) / 2;
@@ -999,7 +985,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     const xToPx = x => pad.l + (clamp(x, xMin, xMax) - xMin) / (xMax - xMin) * plotW;
     const yToPx = y => pad.t + (1 - clamp(y, 0, yMax) / yMax) * plotH;
 
-    // axes + grid
     pctx.save();
     pctx.strokeStyle = state.theme.grid;
     pctx.fillStyle = state.theme.vec;
@@ -1007,30 +992,23 @@ twa/tws;4;6;8;10;12;14;16;20;24
     pctx.globalAlpha = 0.55;
     pctx.lineWidth = 1;
 
-    // vertical grid every 30°
     for (let x = 0; x <= 180; x += 30) {
       const px = xToPx(x);
       pctx.beginPath(); pctx.moveTo(px, pad.t); pctx.lineTo(px, pad.t + plotH); pctx.stroke();
     }
-    // horizontal grid every 2 kn
     const yStep = 2;
     for (let y = 0; y <= yMax + 1e-9; y += yStep) {
       const py = yToPx(y);
       pctx.beginPath(); pctx.moveTo(pad.l, py); pctx.lineTo(pad.l + plotW, py); pctx.stroke();
     }
 
-    // axes
     pctx.globalAlpha = 0.85;
     pctx.beginPath(); pctx.moveTo(pad.l, pad.t); pctx.lineTo(pad.l, pad.t + plotH); pctx.stroke();
     pctx.beginPath(); pctx.moveTo(pad.l, pad.t + plotH); pctx.lineTo(pad.l + plotW, pad.t + plotH); pctx.stroke();
 
-    // labels
     pctx.globalAlpha = 1;
     pctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
-    <!-- pctx.fillText("TWA (abs)", pad.l, cssH - 2); -->
-    <!-- pctx.fillText("BSP", 10, pad.t + 12); -->
 
-    // tick labels
     pctx.globalAlpha = 0.9;
     for (let x = 0; x <= 180; x += 30) {
       const px = xToPx(x);
@@ -1041,11 +1019,9 @@ twa/tws;4;6;8;10;12;14;16;20;24
       pctx.fillText(`${y.toFixed(0)}`, 16, py + 4);
     }
 
-    // header
     pctx.globalAlpha = 1;
-    pctx.fillText(`POLAR  (TWS≈${fmt(TWS,1)} kn)`, pad.l, 14);
+    pctx.fillText(`POLAR  (TWS≈${fmt(TWS, DEC.SPEED)} kn)`, pad.l, 14);
 
-    // thin curves for each discrete row
     pctx.globalAlpha = 0.35;
     pctx.lineWidth = 2;
     pctx.setLineDash([6, 6]);
@@ -1062,7 +1038,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
       pctx.stroke();
     }
 
-    // thick interpolated curve at current TWS
     pctx.globalAlpha = 0.95;
     pctx.lineWidth = 3;
     pctx.setLineDash([]);
@@ -1077,7 +1052,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     pctx.strokeStyle = state.theme.vec;
     pctx.stroke();
 
-    // VMG markers (interpolated)
     const up = polarVMGPoint(TWS, "up");
     const dn = polarVMGPoint(TWS, "dn");
 
@@ -1088,7 +1062,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
       pctx.strokeStyle = state.theme.vec;
       pctx.globalAlpha = 0.95;
 
-      // small triangle
       const s = 7;
       pctx.beginPath();
       if (kind === "up") {
@@ -1109,7 +1082,6 @@ twa/tws;4;6;8;10;12;14;16;20;24
     drawMarker(xToPx(up.twa), yToPx(up.bsp), "up");
     drawMarker(xToPx(dn.twa), yToPx(dn.bsp), "dn");
 
-    // current point (abs(TWA), BSP)
     const xCur = clamp(Math.abs(TWA), 0, 180);
     const pxCur = xToPx(xCur);
     const pyCur = yToPx(BSP);
@@ -1120,12 +1092,10 @@ twa/tws;4;6;8;10;12;14;16;20;24
     pctx.fillStyle = state.theme.vec;
     pctx.fill();
 
-    // annotation
     pctx.globalAlpha = 0.95;
     pctx.fillStyle = state.theme.vec;
-    const label = `TWA ${xCur.toFixed(1)}°  BSP ${fmt(BSP,2)} kn`;
-    <!-- pctx.fillText(label, Math.min(pxCur - 10, pad.l + plotW - 220), Math.max(pyCur - 10, pad.t + 14)); -->
-    pctx.fillText(label, pad.l+plotW-200, 14);
+    const label = `TWA ${xCur.toFixed(DEC.POLAR_TWA)}°  BSP ${Number(BSP).toFixed(DEC.POLAR_BSP)} kn`;
+    pctx.fillText(label, pad.l + plotW - 200, 14);
 
     pctx.restore();
   }
