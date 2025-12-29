@@ -76,7 +76,7 @@
     .toolbar { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; margin-top: 8px; }
     canvas { width: 100%; border-radius: 12px; border: 1px solid var(--border); background: var(--bgCanvas); display:block; }
 
-    #cv { height: 420px; }
+    #cv { height: 420px; margin-top: 10px;}
     #polarCv { height: 260px; margin-top: 10px; }
 
     .numCtl { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: center; }
@@ -89,7 +89,7 @@
     .delta.zero, .base.zero { opacity: .55; }
 
     .split2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
-    .miniCard { border: 1px solid var(--border2); border-radius: 12px; padding: 10px; }
+    .miniCard { border: 0px solid var(--border2); border-radius: 12px; padding: 10px; margin-top:10px; ; }
 
     /* mode + tack controls */
     .modeRow { display:flex; align-items:center; gap:12px; margin: 10px 0 12px 0; }
@@ -100,7 +100,7 @@
   </style>
 </head>
 <body>
-  <h1>Sailing Processor Model</h1>
+  <!-- <h1>Sailing Processor Model</h1> -->
 
   <div class="grid">
     <div class="card">
@@ -109,7 +109,7 @@
         <br/>
         Wind dirs are <span class="mono">FROM</span>, boat/current dirs are <span class="mono">TO</span>.
         <br/>
-        <span class="mono">BSP</span> comes from the loaded polar (edit it in JS).
+        <span class="mono">BSP, TWA</span> comes from the loaded polar, depending on mode.
       </div>
 
       <hr style="border:none;border-top:1px solid var(--border2); margin: 12px 0;" />
@@ -231,23 +231,22 @@
         </tbody>
       </table>
 
-      <div style="margin-top:10px;">
-        <canvas id="cv" width="980" height="520"></canvas>
-        <canvas id="polarCv" width="980" height="360"></canvas>
-      </div>
 
       <div class="split2">
+      <div>
+        <canvas id="polarCv" width="980" height="360"></canvas>
         <div class="miniCard small">
           Polar view:
           <br/>• thin curves = discrete <span class="mono">TWS</span> rows
           <br/>• thick curve = interpolated at current <span class="mono">TWS</span>
           <br/>• dot = current <span class="mono">(abs(TWA), BSP)</span>
-        </div>
-        <div class="miniCard small">
+          <br>
           VMG markers:
           <br/>• <span class="mono">▲</span> upwind VMG point (<span class="mono">twaUp/bspUp</span>)
           <br/>• <span class="mono">▼</span> downwind VMG point (<span class="mono">twaDn/bspDn</span>)
         </div>
+      </div>
+        <canvas id="cv" width="980" height="520"></canvas>
       </div>
     </div>
   </div>
@@ -1028,8 +1027,8 @@
     // labels
     pctx.globalAlpha = 1;
     pctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace";
-    pctx.fillText("TWA (abs)", pad.l, cssH - 12);
-    pctx.fillText("BSP", 10, pad.t + 12);
+    <!-- pctx.fillText("TWA (abs)", pad.l, cssH - 2); -->
+    <!-- pctx.fillText("BSP", 10, pad.t + 12); -->
 
     // tick labels
     pctx.globalAlpha = 0.9;
@@ -1125,7 +1124,8 @@
     pctx.globalAlpha = 0.95;
     pctx.fillStyle = state.theme.vec;
     const label = `TWA ${xCur.toFixed(1)}°  BSP ${fmt(BSP,2)} kn`;
-    pctx.fillText(label, Math.min(pxCur + 10, pad.l + plotW - 220), Math.max(pyCur - 10, pad.t + 14));
+    <!-- pctx.fillText(label, Math.min(pxCur - 10, pad.l + plotW - 220), Math.max(pyCur - 10, pad.t + 14)); -->
+    pctx.fillText(label, pad.l+plotW-200, 14);
 
     pctx.restore();
   }
