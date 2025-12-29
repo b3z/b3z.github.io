@@ -90,6 +90,13 @@
 
     .split2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
     .miniCard { border: 1px solid var(--border2); border-radius: 12px; padding: 10px; }
+
+    /* mode + tack controls */
+    .modeRow { display:flex; align-items:center; gap:12px; margin: 10px 0 12px 0; }
+    .modeGroup { display:flex; gap:10px; flex-wrap:wrap; }
+    .modeOpt { font-size: 12px; opacity: .9; display:flex; align-items:center; gap:6px; }
+    .modeSpacer { flex: 1; }
+    .tackGroup[aria-disabled="true"] { opacity: .55; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -107,16 +114,36 @@
 
       <hr style="border:none;border-top:1px solid var(--border2); margin: 12px 0;" />
 
-      <!-- HDG -->
-      <div class="row">
-        <label for="hdg">HDG</label>
-        <div class="numCtl">
-          <button class="pmBtn" id="hdgM" aria-label="HDG minus">−</button>
-          <input id="hdgN" type="number" step="1" />
-          <button class="pmBtn" id="hdgP" aria-label="HDG plus">+</button>
+      <!-- MODE + TACK -->
+      <div class="modeRow">
+        <label>Mode</label>
+        <div class="modeGroup">
+          <label class="modeOpt"><input type="radio" name="mode" id="modeFree" checked> free</label>
+          <label class="modeOpt"><input type="radio" name="mode" id="modeVmgUp"> vUp</label>
+          <label class="modeOpt"><input type="radio" name="mode" id="modeVmgDn"> vDn</label>
+        </div>
+
+        <span class="modeSpacer"></span>
+
+        <label>Tack</label>
+        <div class="modeGroup tackGroup" id="tackGroup" aria-disabled="true">
+          <label class="modeOpt"><input type="radio" name="tack" id="tackPort" value="-1"> port</label>
+          <label class="modeOpt"><input type="radio" name="tack" id="tackStbd" value="1" checked> stbd</label>
         </div>
       </div>
-      <input id="hdg" type="range" min="0" max="359" step="1" />
+
+      <!-- HDG (hidden in VMG modes) -->
+      <div id="hdgBlock">
+        <div class="row">
+          <label for="hdg">HDG</label>
+          <div class="numCtl">
+            <button class="pmBtn" id="hdgM" aria-label="HDG minus">−</button>
+            <input id="hdgN" type="number" step="1" />
+            <button class="pmBtn" id="hdgP" aria-label="HDG plus">+</button>
+          </div>
+        </div>
+        <input id="hdg" type="range" min="0" max="359" step="1" />
+      </div>
 
       <!-- GWD -->
       <div class="row">
@@ -138,7 +165,7 @@
           <button class="pmBtn" id="gwsP" aria-label="GWS plus">+</button>
         </div>
       </div>
-      <input id="gws" type="range" min="0" max="60" step="1" />
+      <input id="gws" type="range" min="0" max="40" step="1" />
 
       <!-- SET -->
       <div class="row">
@@ -186,10 +213,11 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>BSP</td><td class="mono base" id="bspB"></td><td class="mono" id="bspOut"></td><td class="mono delta" id="bspD"></td></tr>
 
           <tr><td>COG</td><td class="mono base" id="cogB"></td><td class="mono" id="cog"></td><td class="mono delta" id="cogD"></td></tr>
           <tr><td>SOG</td><td class="mono base" id="sogB"></td><td class="mono" id="sog"></td><td class="mono delta" id="sogD"></td></tr>
+
+          <tr><td>BSP</td><td class="mono base" id="bspB"></td><td class="mono" id="bspOut"></td><td class="mono delta" id="bspD"></td></tr>
 
           <tr><td>AWA</td><td class="mono base" id="awaB"></td><td class="mono" id="awa"></td><td class="mono delta" id="awaD"></td></tr>
           <tr><td>AWS</td><td class="mono base" id="awsB"></td><td class="mono" id="aws"></td><td class="mono delta" id="awsD"></td></tr>
@@ -449,7 +477,16 @@
     drift: el("drift"), driftN: el("driftN"), driftM: el("driftM"), driftP: el("driftP"),
     baseline: el("baseline"),
     baselineInfo: el("baselineInfo"),
-    reset: el("reset")
+    reset: el("reset"),
+
+    // mode/tack
+    modeFree: el("modeFree"),
+    modeVmgUp: el("modeVmgUp"),
+    modeVmgDn: el("modeVmgDn"),
+    hdgBlock: el("hdgBlock"),
+    tackGroup: el("tackGroup"),
+    tackPort: el("tackPort"),
+    tackStbd: el("tackStbd"),
   };
 
   const out = {
@@ -479,7 +516,9 @@
   const state = {
     baseline: null,
     lastComputed: null,
-    theme: null
+    theme: null,
+    mode: "free",   // "free" | "vmgUp" | "vmgDn"
+    tack: +1        // +1 stbd, -1 port (only used in VMG modes)
   };
 
   function readTheme() {
@@ -549,6 +588,18 @@
     inputs.gws.value = "14";  inputs.gwsN.value = "14";
     inputs.set.value = "0";   inputs.setN.value = "0";
     inputs.drift.value = "0"; inputs.driftN.value = "0";
+
+    // default mode/tack
+    inputs.modeFree.checked = true;
+    inputs.modeVmgUp.checked = false;
+    inputs.modeVmgDn.checked = false;
+    inputs.tackStbd.checked = true;
+    inputs.tackPort.checked = false;
+
+    state.mode = "free";
+    state.tack = +1;
+
+    updateModeUI();
   }
 
   function setDeltaCell(cell, delta, isAngle=false, digits=2) {
@@ -599,10 +650,36 @@
     recalc(true);
   });
 
+  function updateModeUI() {
+    const showHdg = (state.mode === "free");
+    inputs.hdgBlock.style.display = showHdg ? "" : "none";
+
+    const tackEnabled = !showHdg;
+    inputs.tackGroup.setAttribute("aria-disabled", tackEnabled ? "false" : "true");
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    updateModeUI();
+    recalc(false);
+  }
+
+  function setTack(sign) {
+    state.tack = sign;
+    recalc(false);
+  }
+
+  inputs.modeFree.addEventListener("change", () => inputs.modeFree.checked && setMode("free"));
+  inputs.modeVmgUp.addEventListener("change", () => inputs.modeVmgUp.checked && setMode("vmgUp"));
+  inputs.modeVmgDn.addEventListener("change", () => inputs.modeVmgDn.checked && setMode("vmgDn"));
+
+  inputs.tackPort.addEventListener("change", () => inputs.tackPort.checked && setTack(-1));
+  inputs.tackStbd.addEventListener("change", () => inputs.tackStbd.checked && setTack(+1));
+
   function recalc(resetDelta=false) {
     readTheme();
 
-    const HDG = Number(inputs.hdg.value);
+    let HDG = Number(inputs.hdg.value);
 
     const GWD_from = Number(inputs.gwd.value);
     const GWS = Number(inputs.gws.value);
@@ -620,6 +697,21 @@
     const V_tw_to = { x: V_gw_to.x - V_cur.x, y: V_gw_to.y - V_cur.y };
     const TWS = Math.hypot(V_tw_to.x, V_tw_to.y);
     const TWD_from = windDirFromVec(V_tw_to);
+
+    // MODE LOGIC 
+    // VMG modes: take target TWA from polar (based on current TWS), choose tack, then derive HDG.
+    if (state.mode === "vmgUp" || state.mode === "vmgDn") {
+      const which = (state.mode === "vmgUp") ? "up" : "dn";
+      const targetAbs = polarVMGPoint(TWS, which).twa;
+      const targetTWA = state.tack * targetAbs; // +stbd, -port
+
+      // TWA = angDiffDeg(TWD_from, HDG)  =>  HDG = TWD_from - TWA
+      HDG = wrap360(TWD_from - targetTWA);
+
+      // keep UI in sync (even if hidden)
+      inputs.hdg.value = String(Math.round(HDG));
+      inputs.hdgN.value = String(Math.round(HDG));
+    }
 
     // TWA in boat frame (FROM)
     const V_tw_boat = vecNEToBoat(V_tw_to, HDG);
